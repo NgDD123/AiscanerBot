@@ -1,0 +1,105 @@
+/* General Styles for Desktop */
+.navbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  background-color: #220314bb;
+  padding: 10px 20px; /* Adjusted padding for desktop */
+  height: 50px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar ul {
+  list-style-type: none;
+  display: flex;
+  padding: 0;
+  margin: 0;
+}
+
+.navbar ul li {
+  margin-right: 20px;
+}
+
+.navbar ul li:last-child {
+  margin-right: 0;
+}
+
+.navbar a {
+  color: rgba(198, 201, 13, 0.726);
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.navbar a:hover {
+  text-decoration: underline;
+}
+
+.navbar-options {
+  display: flex;
+  align-items: center;
+}
+
+.nav-options {
+  cursor: pointer;
+}
+
+.nav-optionOne {
+
+  padding: 0;
+}
+
+.nav-optionTwo {
+  margin-left: 20px;
+}
+
+/* Styles for Tablets (Portrait & Landscape) */
+@media (max-width: 1024px) {
+  .navbar {
+    padding: 10px 15px; /* Reduce padding for smaller screens */
+  }
+
+  .navbar ul {
+    flex-direction: row;
+  }
+
+  .navbar ul li {
+    margin-right: 15px;
+  }
+
+  .nav-optionTwo {
+    margin-left: 10px; /* Reduce space between email and sign out */
+  }
+}
+
+/* Styles for Mobile Phones */
+@media (max-width: 400px) {
+  .navbar {
+    flex-direction: column; /* Stack the navbar items vertically */
+    align-items: center;
+    height: auto; /* Adjust the height */
+    padding: 10px; /* Adjust padding */
+  }
+
+  .navbar ul {
+    flex-direction: column; /* Stack menu items vertically */
+    align-items: center;
+    width: 100%;
+  }
+
+  .navbar ul li {
+    margin-right: 0;
+    margin-bottom: 10px; /* Add space between vertical items */
+  }
+
+  .navbar ul li:last-child {
+    margin-bottom: 0;
+  }
+
+  .nav-optionTwo {
+    margin-left: 0; /* Remove space in mobile view */
+    margin-top: 10px; /* Add space between options */
+  }
+}

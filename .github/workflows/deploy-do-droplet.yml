@@ -1,0 +1,55 @@
+name: Deploy Frontend and Backend
+
+on:
+  push:
+    branches:
+      - master  # Run this workflow when pushing to the 'master' branch.
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        # Add GitHub to known_hosts automatically (no manual prompt needed)
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+    - name: Deploy to SSH server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        port: ${{ secrets.SSH_PORT }}
+        username: ${{ secrets.SSH_USERNAME }}
+        password: ${{ secrets.SSH_PASSWORD }}
+        script: |
+          # Navigate to the backend directory and pull the latest changes
+          cd ~/app/botweb
+          git stash
+          git pull origin master
+
+          # Install backend dependencies
+          cd ~/app/botweb/server
+          npm install
+          
+          # Restart the backend using PM2
+          pm2 restart trade-bot
+          # Save the PM2 process list
+          pm2 save
+
+          # Navigate to the frontend directory, pull changes, and build
+          cd ~/app/botweb/client
+          npm install
+          npm run build
+
+          # Copy the built frontend files to the Nginx directory
+          scp -r ./build/* /var/www/html/botwebv2/
+
+          # Restart Nginx (if needed)
+          sudo systemctl restart nginx

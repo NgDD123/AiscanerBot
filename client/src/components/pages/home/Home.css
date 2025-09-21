@@ -1,0 +1,146 @@
+.section1 {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+
+  .Wrapper {
+    max-width: 100%;
+    height: 100%;
+    margin: auto;
+
+    .textContainer {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+
+      h2 {
+        font-size: 35px;
+        color: wheat;
+        letter-spacing: 3px;
+        margin-top: 120px;
+        margin-left: -140px;
+      }
+      h1 {
+        font-size: 60px;
+        font-weight: 600;
+        font-family: "Lucida Sans", "Lucida Sans Regular", "Lucida Grande",
+          "Lucida Sans Unicode", Geneva, Verdana, sans-serif;
+        font-style: inherit;
+        color: rgb(236, 213, 1);
+        margin: 2px 0;
+        letter-spacing: 3px;
+      }
+      img {
+        height: 100%;
+      }
+    }
+  }
+
+  .buttonContainer {
+    display: flex;
+    background: transparent;
+    flex-direction: row;
+    justify-content: center;
+    margin-left: -1000px;
+  }
+
+  .buttonContainer button {
+    background-color: transparent;
+    color: yellow;
+    font-size: 14px;
+    font-weight: 200;
+    padding: 20px 8px;
+    border: 1px solid red;
+    cursor: pointer;
+    margin: 10px;
+  }
+
+  .immagContainer {
+    height: 100%;
+    position: fixed;
+    top: 40px;
+    right: 181px;
+  }
+}
+
+/* Desktop */
+@media screen and (min-width: 1025px) {
+  .section1 {
+    width: 210vh;
+  }
+
+  .buttonContainer {
+    margin-left: -800px;
+  }
+}
+
+/* Tablet */
+@media screen and (max-width: 1024px) and (min-width: 768px) {
+  .section1 {
+    width: 100vw;
+    height: auto;
+  }
+
+  .Wrapper {
+    max-width: 90%;
+  }
+
+  .textContainer {
+    h2 {
+      font-size: 28px;
+      margin-left: -80px;
+      margin-top: 50px;
+    }
+
+    h1 {
+      font-size: 50px;
+    }
+  }
+
+  .buttonContainer {
+    margin-left: -500px;
+  }
+
+  .immagContainer {
+    right: 50px;
+  }
+}
+
+/* Phone */
+@media screen and (max-width: 767px) {
+  .section1 {
+    width: 100vw;
+    height: auto;
+  }
+
+  .Wrapper {
+    max-width: 95%;
+  }
+
+  .textContainer {
+    h2 {
+      font-size: 22px;
+      margin-left: 0;
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 40px;
+      text-align: center;
+    }
+  }
+
+  .buttonContainer {
+    flex-direction: column;
+    margin-left: 0;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .immagContainer {
+    right: 20px;
+  }
+}

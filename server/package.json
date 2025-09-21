@@ -1,0 +1,40 @@
+{
+  "name": "binance-bot",
+  "version": "1.0.0",
+  "description": "Description of your project",
+  "main": "index.js",
+  "scripts": {
+    "start": "cross-env NODE_ENV=production nodemon index.js",
+    "dev": "cross-env NODE_ENV=development nodemon index.js",
+    "build": "npm install"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "nodemon": "^2.0.22"
+  },
+  "dependencies": {
+    "binance-api-node": "^0.12.7",
+    "body-parser": "^1.20.2",
+    "coinpayments": "^2.2.0",
+    "cors": "^2.8.5",
+    "cron": "^2.4.3",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "firebase": "^10.12.5",
+    "firebase-admin": "^12.3.1",
+    "morgan": "^1.10.1",
+    "multer": "^1.4.5-lts.1",
+    "node-binance-api": "^0.13.1",
+    "node-fetch": "^2.7.0",
+    "node-schedule": "^2.1.1",
+    "nodemailer": "^6.9.16",
+    "socket.io": "^4.7.2",
+    "technicalindicators": "^3.1.0",
+    "tronweb": "^5.3.2",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "winston-transport": "^4.9.0",
+    "ws": "^8.16.0"
+  }
+}

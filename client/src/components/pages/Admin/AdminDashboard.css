@@ -1,0 +1,75 @@
+/* General Styles (Mobile View by default) */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.modal-content {
+  background-color: rgba(255, 255, 255, 0.11);
+  padding: 20px;
+  border-radius: 5px;
+  width: 90%; /* Full width for mobile devices */
+  max-width: 400px; /* Default max width */
+  text-align: center;
+}
+
+.modal-content input {
+  margin-bottom: 10px;
+  padding: 8px;
+  width: 100%;
+  font-size: 1rem; /* Responsive font size */
+}
+
+.modal-content button {
+  margin: 5px;
+  padding: 8px 16px;
+  font-size: 1rem; /* Responsive button size */
+}
+
+/* Tablet View (min-width: 768px) */
+@media (min-width: 768px) {
+  .modal-content {
+    width: 80%; /* Slightly smaller width for tablets */
+    max-width: 450px; /* Increased max-width for tablets */
+  }
+
+  .modal-content input,
+  .modal-content button {
+    font-size: 1.1rem; /* Larger font size on tablets */
+  }
+}
+
+/* Desktop View (min-width: 1024px) */
+@media (min-width: 1024px) {
+  .modal-content {
+    width: 60%; /* More limited width for desktops */
+    max-width: 500px; /* Larger modal size for desktop screens */
+  }
+
+  .modal-content input, 
+  .modal-content button {
+    font-size: 1.2rem; /* Increase font size for desktops */
+  }
+}
+
+/* Large Screens (min-width: 1440px) */
+@media (min-width: 1440px) {
+  .modal-content {
+    width: 40%; /* Narrower width on very large screens */
+    max-width: 600px; /* Larger modal size for large screens */
+  }
+
+  .modal-content input, 
+  .modal-content button {
+    font-size: 1.3rem; /* Larger font size for large screens */
+  }
+}

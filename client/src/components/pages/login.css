@@ -1,0 +1,103 @@
+.login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.login-logo {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  width: 40px;
+  margin-right: auto;
+  margin-left: auto;
+}
+.login-container {
+  height: fit-content;
+  display: flex;
+  flex-direction: column;
+  border-radius: 5px;
+  border: 1px solid lightgray;
+  padding: 20px;
+}
+.login-container > h1 {
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+.login-container > form > h5 {
+  margin-bottom: 5px;
+}
+.login-container > form > input {
+  height: 30px;
+  margin-bottom: 10px;
+  background-color: white;
+  width: 98%;
+}
+.login-container > p {
+  margin-top: 15px;
+  font-size: 12px;
+}
+.login-signInButton {
+  background-color: #f0c14b;
+  width: 100%;
+  border: 1px solid;
+  margin-top: 10px;
+  border-color: #a88734;
+}
+.login-registerButton {
+  border-radius: 2px;
+  width: 100%;
+  height: 30px;
+  border: 1px solid;
+  margin-top: 1px;
+  background-color: lightgray;
+}
+
+/* Media Queries for Responsiveness */
+
+/* Large screens (desktops, laptops) */
+@media (min-width: 1024px) {
+  .login-container {
+    width: 400px; /* Adjust width for large screens */
+  }
+}
+
+/* Tablets */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .login-container {
+    width: 350px; /* Adjust width for tablets */
+  }
+
+  .login-logo {
+    width: 60px; /* Slightly larger logo for tablets */
+  }
+}
+
+/* Mobile devices */
+@media (max-width: 767px) {
+  .login-container {
+    width: 90%; /* Full width on mobile */
+  }
+
+  .login-logo {
+    width: 50px; /* Adjust logo size for smaller devices */
+  }
+
+  .login-container > form > input {
+    width: 100%; /* Input fields take full width */
+  }
+
+  .login-signInButton,
+  .login-registerButton {
+    width: 100%; /* Buttons take full width */
+  }
+}
+
+/* Very small devices (phones in portrait mode) */
+@media (max-width: 480px) {
+  .login-container {
+    width: 95%; /* Maximize space on very small devices */
+  }
+
+  .login-logo {
+    width: 40px; /* Logo size optimized for small devices */
+  }
+}

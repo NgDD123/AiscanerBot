@@ -1,0 +1,193 @@
+.trade {
+  text-align: center;
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.trading-bot-image {
+  position: absolute; /* Position the image absolutely */
+  top: 50px; /* Align to the top */
+  left: 200px; /* Align to the left */
+}
+
+.trading-bot-image img {
+  width: 300px; /* Adjust size as needed */
+  height: 450px; /* Maintain aspect ratio */
+  box-shadow: inset;
+}
+
+.apiKey {
+  margin: 0; /* Set margin to zero */
+  text-align: left; /* Align text to the left */
+}
+
+.apiKey label {
+  display: block; /* Make label a block element */
+  margin-bottom: 2px; /* Add some bottom margin for spacing */
+}
+
+.apiKey input {
+  width: 100%; /* Make input full-width */
+  padding: 1px; /* Add padding for better appearance */
+  box-sizing: border-box; /* Include padding and border in the width */
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(238, 235, 86, 0.925);
+  border-radius: 5px;
+}
+
+.exchangeType {
+  position: absolute; /* Position the image absolutely */
+  top: 220px; /* Align to the top */
+  left: 200px;
+   
+}
+
+.exchangeType {
+  display: flex;
+  padding: 2px;
+  flex-direction: column;
+  width: 40%;
+  .Exchange{
+    background-color: blue;
+    color: white;
+  }
+  .option{
+    position: absolute;
+    top: 280px;
+    left: 200;
+    width: 170px;
+  }
+}
+
+.connectBtt {
+  position: absolute;
+  top: 180px;
+  left: 200;
+  width: 170px;
+  background-color: blue;
+  color: white;
+ 
+}
+
+.TradingOption {
+  position: absolute;
+  top: 100px;
+  right: 100px;
+  color: white;
+  margin-bottom: 20px; /* Add some spacing */
+  display: flex;
+  padding: 2px;
+  flex-direction: column;
+  .oders{
+    background-color: blue;
+    color: white;
+
+  }
+  .paire{
+    background-color: blue;
+    color: white;
+  }
+}
+
+.BotControl {
+  margin-bottom: 20px; /* Add some spacing */
+  padding: 2px;
+  color: blue;
+}
+
+.Account {
+  position: absolute; /* Position the account section absolutely */
+  top: 490px; /* Align to the top */
+  left: 200px; /* Align to the right */
+  border: 1px solid white; /* Add border for visibility */
+  padding: 10px; 
+  height: 200px;
+  font-size: 12px;
+}
+
+.Account-content { 
+  margin-left: 0;
+  margin: 0;
+  right: 0;
+  display: flex; /* Use flexbox for layout */
+  flex-direction: column; /* Stack items vertically */
+  align-items: flex-end; /* Align items to the right */
+  color: blueviolet;
+  margin: 0;
+  font-size: 12px;
+}
+
+button {
+  margin-top: 10px; /* Add some spacing between buttons */
+  padding: 2px;
+  background-color: blue;
+  color: white;
+}
+/* Responsive design for tablets */
+@media (max-width: 1024px) {
+.trade {
+    font-size: calc(8px + 2vmin);
+}
+.trading-bot-image img {
+    width: 250px;
+    height: 375px;
+}
+.apiKey, .exchangeType, .connectBtt, .TradingOption, .Account {
+    position: static;
+    width: 85%;
+    margin: 15px auto;
+}
+.Account {
+    height: auto;
+}
+button {
+    width: 100%;
+}
+}
+
+/* Responsive design for Android phones */
+@media (max-width: 600px) {
+.botTitle {
+    font-size: 50px;
+}
+.trading-bot-image img {
+    width: 100%;
+    height: auto;
+}
+.apiKey, .exchangeType, .connectBtt, .TradingOption, .Account {
+    position: static;
+    width: 90%;
+    margin: 10px auto;
+}
+.Account {
+    width: 100%;
+    height: auto;
+}
+.Account-content {
+    align-items: flex-start;
+}
+button {
+    width: 100%;
+}
+}
+
+/* Responsive design for larger screens */
+@media (min-width: 1200px) {
+.trade {
+    font-size: calc(12px + 2vmin);
+}
+.trading-bot-image img {
+    width: 350px;
+    height: 525px;
+}
+}
