@@ -76,7 +76,9 @@ async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'bin
         asks: lastSnapshot.asks,
         strongSupport,
         strongResistance,
-        ltp
+        ltp,
+         largeBidWalls: persistentLargeBidWalls,   // ✅ Add this
+         largeAskWalls: persistentLargeAskWalls    // ✅ Add this
     };
 }
 

@@ -25,7 +25,9 @@ const bestpairRoute = require ('./Routes/bestPair')
 const evaluateStrategyRoute = require ('./Routes/evaluateStrategy')
 const toppairsRoute = require ('./Routes/topPairs')
 const { evaluateStrategy } = require('./models/strategyEvaluator'); 
-
+const chartRoutes = require('./Routes/chartData');
+const { executeTrade } = require('./models/trade.model'); // NEW: separate executeTrade
+const { getAdvancedMarketMakers } = require('./models/marketMakers');
 
 // different logger instances
 
@@ -57,6 +59,7 @@ app.use('/blogs', blogRoute);
 app.use('/api/top-pairs', toppairsRoute);
 app.use('/evaluatestarategy', evaluateStrategyRoute )
 app.use('/api/best-pair', bestpairRoute )
+app.use('/api/chart-data', chartRoutes);
 
 // Middleware for logging requests (optional)
 app.use((req, res, next) => {
@@ -90,30 +93,49 @@ function normalizeExchangeType(exchangeType) {
 app.get('/api/trade-decision', async (req, res) => {
     try {
         const symbol = req.query.symbol;
+        const exchangeType = req.headers['x-exchange-type']?.toLowerCase() || 'binancefutures';
+
         if (!symbol) {
             return res.status(400).json({ error: 'Symbol not provided' });
         }
 
+        // 1️⃣ Strategy signals
         const strategyResult = await evaluateStrategy(symbol);
-        console.log(strategyResult)
-        let decision = 'Hold';
-        if (strategyResult.signal === 'BUY') {
-            decision = 'Buy';
-        } else if (strategyResult.signal === 'SELL') {
-            decision = 'Sell';
-        }
-        tradingLogger.info(`Trade decision fetched successfully with decision ${decision} and signal details : ${strategyResult}`)
+        console.log("[DEBUG] Strategy Result:", strategyResult);
 
-        res.json({
-            decision,
-            signalDetails: strategyResult
+        // 2️⃣ Market maker strong levels (support / resistance)
+        const {
+            strongSupport,
+            strongResistance
+        } = await getAdvancedMarketMakers(symbol, 1000, exchangeType);
+
+        console.log("[DEBUG] Market Maker Levels:", {
+            strongSupport: strongSupport?.price,
+            strongResistance: strongResistance?.price
         });
+
+        // 3️⃣ Decision logic
+        let decision = "Hold";
+        if (strategyResult.signal === "BUY") decision = "Buy";
+        if (strategyResult.signal === "SELL") decision = "Sell";
+
+        tradingLogger.info(
+            `Trade decision fetched successfully | Decision: ${decision} | Signal: ${strategyResult.signal}`
+        );
+
+        // 4️⃣ Send FULL response including strong levels
+        return res.json({
+            decision,
+            signalDetails: strategyResult,
+            strongSupport: strongSupport?.price || null,
+            strongResistance: strongResistance?.price || null
+        });
+
     } catch (error) {
-        console.log('Error calculating trade decision:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        console.log("Error calculating trade decision:", error);
+        return res.status(500).json({ error: "Internal server error" });
     }
 });
-
 
 
 
@@ -573,279 +595,63 @@ app.post('/api/close-position', async (req, res) => {
 
 
 
-// Execute a trade on Binance with trailing stop order
-async function executeTrade(apiKey, apiSecretKey, symbol, decision, lastPrice, exchangeType, availableUSDT, userEmail = null) {
-    try {
-        if (!apiKey || !apiSecretKey || !symbol || !decision || !lastPrice || isNaN(lastPrice) || !availableUSDT || isNaN(availableUSDT) || !exchangeType) {
-            throw new Error('Invalid input parameters');
-        }
-      const baseUrl = getBinanceBaseUrl(exchangeType);
-        // Helper function to fetch Binance server time
-        async function getServerTime() {
-            const serverTimeResponse = await fetch(`${baseUrl}/fapi/v1/time`);
-            if (!serverTimeResponse.ok) {
-                throw new Error('Failed to fetch Binance server time');
-            }
-            const serverTimeData = await serverTimeResponse.json();
-            return serverTimeData.serverTime;
-        }
-
-        // Step 1: Fetch Binance server time
-        let serverTime = await getServerTime();
-
-        const action = decision === 'Buy' ? 'BUY' : 'SELL';
-        const url = `${baseUrl}/fapi/v1/order`;
-
-        // Step 2: Fetch asset precision from Binance API
-        const assetInfoResponse = await fetch(`${baseUrl}/fapi/v1/exchangeInfo`);
-        if (!assetInfoResponse.ok) {
-            throw new Error('Failed to fetch asset information from Binance API');
-        }
-        const assetInfo = await assetInfoResponse.json();
-        const symbolInfo = assetInfo.symbols.find(asset => asset.symbol === symbol);
-        const quantityPrecision = symbolInfo ? symbolInfo.quantityPrecision : 8;
-        const pricePrecision = symbolInfo ? symbolInfo.pricePrecision : 8;
-        console.log(`Quantity Precision for ${symbol}:`, quantityPrecision);
-        console.log(`Price Precision for ${symbol}:`, pricePrecision);
-
-        // Calculate the quantity based on available USDT balance
-        let adjustedQuantity = ((availableUSDT * 0.98) / lastPrice).toFixed(quantityPrecision);
-        adjustedQuantity = parseFloat(adjustedQuantity);
-        if (isNaN(adjustedQuantity) || adjustedQuantity <= 0) {
-            throw new Error('Quantity is not a valid positive number');
-        }
-
-        // Step 3: Set leverage to 1x if not already set
-        const leverageUrl = `${baseUrl}/fapi/v1/leverage`;
-        const leverageParams = {
-            symbol,
-            leverage: 1,
-            timestamp: serverTime
-        };
-
-        const leverageQueryString = Object.entries(leverageParams).map(([key, value]) => `${key}=${value}`).join('&');
-        const leverageSignature = crypto.createHmac('sha256', apiSecretKey).update(leverageQueryString).digest('hex');
-
-        const leverageResponse = await fetch(`${leverageUrl}?${leverageQueryString}&signature=${leverageSignature}`, {
-            method: 'POST',
-            headers: {
-                'X-MBX-APIKEY': apiKey,
-            }
-        });
-
-        const leverageData = await leverageResponse.json();
-        if (!leverageResponse.ok) {
-            console.error('Binance API error response:', leverageData);
-            throw new Error(`Failed to set leverage: ${leverageData.msg || 'Unknown error'}`);
-        }
-
-        console.log('Leverage set to 1x:', leverageData);
-
-        // Step 4: Place the Market Order
-        serverTime = await getServerTime(); // Re-fetch server time
-        const marketOrderParams = {
-            symbol,
-            side: action,
-            type: 'MARKET',
-            quantity: adjustedQuantity,
-            timestamp: serverTime,
-        };
-
-        const marketOrderQueryString = Object.entries(marketOrderParams).map(([key, value]) => `${key}=${value}`).join('&');
-        const marketOrderSignature = crypto.createHmac('sha256', apiSecretKey).update(marketOrderQueryString).digest('hex');
-
-        const marketOrderResponse = await fetch(`${url}?${marketOrderQueryString}&signature=${marketOrderSignature}`, {
-            method: 'POST',
-            headers: {
-                'X-MBX-APIKEY': apiKey,
-            }
-        });
-
-        const marketOrderData = await marketOrderResponse.json();
-        if (!marketOrderResponse.ok) {
-            console.error('Binance API error response:', marketOrderData);
-            throw new Error(`Failed to execute market ${action.toLowerCase()} order: ${marketOrderData.msg || 'Unknown error'}`);
-        }
-
-        console.log('Market order executed:', marketOrderData);
-
-        // Step 5: Set the Trailing Stop-Market Order
-        serverTime = await getServerTime(); // Re-fetch server time
-        const callbackRate = 2; // 1% callback rate
-
-        let activationPrice;
-        if (action === 'BUY') {
-            activationPrice = lastPrice * 1.02; // 2% higher for long positions
-        } else {
-            activationPrice = lastPrice * 0.98; // 2% lower for short positions
-        }
-
-        const trailingStopParams = {
-            symbol,
-            side: action === 'BUY' ? 'SELL' : 'BUY',
-            type: 'TRAILING_STOP_MARKET',
-            quantity: adjustedQuantity,
-            callbackRate,
-            reduceOnly: true,
-            activationPrice: activationPrice.toFixed(pricePrecision),
-            timestamp: serverTime,
-        };
-        const trailingStopQueryString = Object.entries(trailingStopParams).map(([key, value]) => `${key}=${value}`).join('&');
-        const trailingStopSignature = crypto.createHmac('sha256', apiSecretKey).update(trailingStopQueryString).digest('hex');
-
-        const trailingStopResponse = await fetch(`${url}?${trailingStopQueryString}&signature=${trailingStopSignature}`, {
-            method: 'POST',
-            headers: {
-                'X-MBX-APIKEY': apiKey,
-            }
-        });
-
-        const trailingStopData = await trailingStopResponse.json();
-        if (!trailingStopResponse.ok) {
-            console.error('Binance API error response:', trailingStopData);
-            throw new Error(`Failed to set trailing stop order: ${trailingStopData.msg || 'Unknown error'}`);
-        }
-
-        console.log('Trailing stop order set:', trailingStopData);
-
-        // Step 6: Set the Stop-Loss Order
-        serverTime = await getServerTime(); // Re-fetch server time
-
-        let stopLossPrice;
-        if (action === 'BUY') {
-            stopLossPrice = lastPrice * 0.8; // 2% below for long positions
-        } else {
-            stopLossPrice = lastPrice * 1.2; // % above for short positions
-        }
-
-        stopLossPrice = parseFloat(stopLossPrice.toFixed(pricePrecision));
-
-        if (isNaN(stopLossPrice) || stopLossPrice <= 0) {
-            throw new Error('Calculated stop-loss price is invalid.');
-        }
-
-        console.log(`Calculated stop-loss price for ${symbol}: ${stopLossPrice}`);
-
-        const stopLossParams = {
-            symbol,
-            side: action === 'BUY' ? 'SELL' : 'BUY',
-            type: 'STOP_MARKET',
-            quantity: adjustedQuantity,
-            reduceOnly: true,
-            stopPrice: stopLossPrice,
-            timestamp: serverTime,
-        };
-        const stopLossQueryString = Object.entries(stopLossParams).map(([key, value]) => `${key}=${value}`).join('&');
-        const stopLossSignature = crypto.createHmac('sha256', apiSecretKey).update(stopLossQueryString).digest('hex');
-
-        const stopLossResponse = await fetch(`${url}?${stopLossQueryString}&signature=${stopLossSignature}`, {
-            method: 'POST',
-            headers: {
-                'X-MBX-APIKEY': apiKey,
-            }
-        });
-
-        const stopLossData = await stopLossResponse.json();
-        if (!stopLossResponse.ok) {
-            console.error('Binance API error response:', stopLossData);
-            throw new Error(`Failed to set stop-loss order: ${stopLossData.msg || 'Unknown error'}`);
-        }
-
-        console.log('Stop-loss order set:', stopLossData);
-
-        // Return the combined response for market, trailing stop, and stop-loss orders
-        return {
-            leverage: leverageData,
-            marketOrder: marketOrderData,
-            trailingStopOrder: trailingStopData,
-            stopLossOrder: stopLossData
-        };
-
-    } catch (error) {
-        console.error('Error executing trade:', error.message);
-        throw new Error('Failed to execute trade');
-    }
-}
-
-
+// route:
 app.post('/api/execute-trade', async (req, res) => {
+  console.log("------ [DEBUG] /api/execute-trade ROUTE CALLED ------");
+
   try {
-    const { apiKey, apiSecretKey, symbol, tradeDecision } = req.body;
-    let { exchangeType } = req.body; // raw value from frontend
+    const { apiKey, apiSecretKey, symbol, tradeDecision, options } = req.body;
+    let { exchangeType, strongSupport, strongResistance } = req.body;
+    const userEmail = req.headers['x-user-email'] || null;
 
-    const userEmail = req.headers['x-user-email'];
+    console.log("[DEBUG] Incoming Body:", { symbol, tradeDecision, strongSupport, strongResistance, options });
+    console.log("[DEBUG] Incoming Headers: x-user-email =", userEmail);
+
     if (!apiKey || !apiSecretKey || !symbol || !exchangeType) {
-      return res.status(400).json({
-        error: 'API key, secret, symbol, or exchange type not provided',
-        received: { apiKey: !!apiKey, apiSecretKey: !!apiSecretKey, symbol, exchangeType }
-      });
+      return res.status(400).json({ error: 'API key, secret, symbol, or exchange type not provided' });
     }
 
-    // ✅ Normalize exchangeType (case-insensitive)
-    exchangeType = exchangeType.toLowerCase();
-    if (exchangeType === 'binancefutures') {
-      exchangeType = 'binancefutures';
-    } else if (exchangeType === 'binancefuturestestnet') {
-      exchangeType = 'binancefuturestestnet';
-    } else if (exchangeType === 'binance') {
-      exchangeType = 'binance';
-    } else {
-      return res.status(400).json({
-        error: 'Invalid exchange type provided',
-        received: exchangeType
-      });
+    if (!tradeDecision) return res.status(400).json({ error: 'tradeDecision is required (Buy / Sell / Hold)' });
+
+    exchangeType = exchangeType.toLowerCase().trim();
+    if (!['binance', 'binancefutures', 'binancefuturestestnet', 'binancetestnet'].includes(exchangeType)) {
+      return res.status(400).json({ error: 'Invalid exchange type provided', received: exchangeType });
     }
 
+    if (tradeDecision.toLowerCase() === 'hold') {
+      console.log("[DEBUG] decision hold");
+      return res.json({ message: 'No trade executed. Decision is Hold.' });
+    }
+
+    // Fetch last price
     const baseUrl = getBinanceBaseUrl(exchangeType);
+    const priceEndpoint = exchangeType.includes('futures')
+      ? `${baseUrl}/fapi/v1/ticker/price?symbol=${symbol}`
+      : `${baseUrl}/api/v3/ticker/price?symbol=${symbol}`;
 
-    console.log(`[DEBUG] Trade Decision: ${tradeDecision}`);
-    console.log(`[DEBUG] Normalized ExchangeType: ${exchangeType}`);
+    const lastPriceResp = await fetch(priceEndpoint);
+    if (!lastPriceResp.ok) return res.status(502).json({ error: 'Failed to fetch last price' });
+    const { price: lastPrice } = await lastPriceResp.json();
 
-    if (tradeDecision === 'Hold') {
-      return res.json({ message: 'No trade executed. Decision is to Hold.' });
-    }
-
-    // ✅ Choose correct price endpoint depending on Spot vs Futures
-    let priceEndpoint;
-    if (exchangeType.includes('futures')) {
-      priceEndpoint = `${baseUrl}/fapi/v1/ticker/price?symbol=${symbol}`;
-    } else {
-      priceEndpoint = `${baseUrl}/api/v3/ticker/price?symbol=${symbol}`;
-    }
-
-    console.log(`[DEBUG] Price endpoint: ${priceEndpoint}`);
-
-    const lastPriceResponse = await fetch(priceEndpoint);
-    if (!lastPriceResponse.ok) {
-      const errText = await lastPriceResponse.text();
-      console.error(`[ERROR] Binance price API for ${symbol}:`, errText);
-      return res.status(502).json({ error: 'Failed to fetch last price from Binance', details: errText });
-    }
-
-    const { price: lastPrice } = await lastPriceResponse.json();
-    console.log(`[DEBUG] Last price for ${symbol}: ${lastPrice}`);
-
-    // ✅ Get account balance
+    // Fetch account info
     const accountInfo = await getAccountInfoFromBinance(apiKey, apiSecretKey, exchangeType);
-    console.log(`[DEBUG] Account info:`, accountInfo);
+    const availableUSDT = parseFloat(exchangeType.includes('futures') ? accountInfo.availableBalance : accountInfo.free);
+    if (!availableUSDT || availableUSDT <= 0) return res.status(400).json({ error: 'Insufficient funds', availableUSDT });
 
-    const availableUSDT = parseFloat(
-      exchangeType.includes('futures')
-        ? accountInfo.availableBalance
-        : accountInfo.free // spot
-    );
-
-    console.log(`[DEBUG] Available USDT: ${availableUSDT}`);
-
-    if (availableUSDT <= 0) {
-      return res.json({ message: 'Insufficient funds for trading', availableUSDT });
-    }
-
-    // ✅ Spot not implemented
     if (!exchangeType.includes('futures')) {
-      return res.json({ message: 'Spot trading not yet implemented in executeTrade' });
+      return res.status(400).json({ error: 'Spot trading not implemented. Use a futures exchangeType.' });
     }
 
+    // ⚡ AUTO-FETCH STRONG SUPPORT/RESISTANCE if missing
+    if (!strongSupport || !strongResistance) {
+      console.log("[DEBUG] Missing support/resistance, fetching from market makers...");
+      const marketData = await getAdvancedMarketMakers(symbol, 1000, exchangeType);
+      strongSupport = marketData.strongSupport?.price ?? lastPrice;
+      strongResistance = marketData.strongResistance?.price ?? lastPrice;
+      console.log("[DEBUG] Auto-fetched strongSupport:", strongSupport, "strongResistance:", strongResistance);
+    }
+
+    console.log("[DEBUG] Calling executeTrade() engine...");
     const tradeResponse = await executeTrade(
       apiKey,
       apiSecretKey,
@@ -854,17 +660,20 @@ app.post('/api/execute-trade', async (req, res) => {
       parseFloat(lastPrice),
       exchangeType,
       availableUSDT,
-      userEmail
+      userEmail,
+      strongSupport,
+      strongResistance,
+      3,
+      options ?? {}
     );
 
-    console.log(`[DEBUG] Trade response:`, tradeResponse);
-    res.json({ tradeResponse });
-  } catch (error) {
-    console.error('[FATAL ERROR in /api/execute-trade]:', error);
-    res.status(500).json({
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    console.log("[DEBUG] Trade Response:", tradeResponse);
+
+    return res.json({ success: true, tradeResponse });
+
+  } catch (err) {
+    console.error("[FATAL ERROR] /api/execute-trade crashed:", err.message);
+    return res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 

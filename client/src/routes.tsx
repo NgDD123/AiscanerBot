@@ -1,9 +1,10 @@
 import { RxDashboard } from "react-icons/rx";
 import { RiAdminFill } from "react-icons/ri";
-import { FaBitcoin } from "react-icons/fa";
+import { FaBitcoin, FaChartLine } from "react-icons/fa"; // ✅ Added chart icon
 import { MdPayments } from "react-icons/md";
 import { CgProfile } from "react-icons/cg";
 import { TfiWrite } from "react-icons/tfi";
+import { AiOutlineOrderedList } from "react-icons/ai";
 
 export const AdminRoutes = [
     {
@@ -12,7 +13,6 @@ export const AdminRoutes = [
         icon: RxDashboard,
         isActive: true
     },
-    ,
     {
         name: "Admin",
         path: "/admin",
@@ -23,6 +23,18 @@ export const AdminRoutes = [
         name: "Trade",
         path: "/trade",
         icon: FaBitcoin,
+        isActive: false
+    },
+    {
+        name: "Trade Chart",        // ✅ New Chart Page
+        path: "/trade-chart",
+        icon: FaChartLine,
+        isActive: false
+    },
+    {
+        name: "Qualified Pairs",
+        path: "/qualified-pairs",
+        icon: AiOutlineOrderedList,
         isActive: false
     },
     {
@@ -37,9 +49,7 @@ export const AdminRoutes = [
         icon: TfiWrite,
         isActive: false
     }
-
-]
-
+];
 
 export const UserRoutes = [
     {
@@ -48,11 +58,22 @@ export const UserRoutes = [
         icon: RxDashboard,
         isActive: true
     },
-
     {
         name: "Trade",
         path: "/trade",
         icon: FaBitcoin,
+        isActive: false
+    },
+    {
+        name: "Trade Chart",        // ✅ New Chart Page
+        path: "/trade-chart",
+        icon: FaChartLine,
+        isActive: false
+    },
+    {
+        name: "Qualified Pairs",
+        path: "/qualified-pairs",
+        icon: AiOutlineOrderedList,
         isActive: false
     },
     {
@@ -61,4 +82,4 @@ export const UserRoutes = [
         icon: CgProfile,
         isActive: false
     }
-]
+];

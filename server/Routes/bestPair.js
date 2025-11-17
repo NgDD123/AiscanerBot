@@ -6,8 +6,10 @@ const { findBestTradingPair } = require('../models/bestPairSelector');
 router.get('/', async (req, res) => {
   try {
     console.log('➡️ GET /api/best-pair called');
+
     const exchangeType = req.headers['x-exchange-type']?.toLowerCase() || 'binancefutures';
     console.log('Exchange type received:', exchangeType);
+
     const bestPair = await findBestTradingPair(exchangeType);
 
     if (bestPair) {
@@ -15,12 +17,24 @@ router.get('/', async (req, res) => {
         status: 'success',
         pair: bestPair.pair,
         signal: bestPair.signal,
-        score: bestPair.score
+        score: bestPair.score,
+        strongSupport: bestPair.strongSupport
+          ? {
+              price: bestPair.strongSupport.price,
+              qty: bestPair.strongSupport.qty
+            }
+          : null,
+        strongResistance: bestPair.strongResistance
+          ? {
+              price: bestPair.strongResistance.price,
+              qty: bestPair.strongResistance.qty
+            }
+          : null
       });
     } else {
       res.status(200).json({
         status: 'no_match',
-        message: 'No pair met the strategy threshold of 7 or score'
+        message: 'No pair met the strategy threshold or liquidity requirements'
       });
     }
   } catch (error) {

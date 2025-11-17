@@ -1,6 +1,6 @@
 const { fetchAutomaticTradingPairs } = require('./topPairsFetcher');
 const { evaluateStrategy } = require('./strategyEvaluator');
-const { getBinanceBaseUrl } = require('../Routes/binanceConfig');
+const { getAdvancedMarketMakers } = require('./marketMakers'); // import your file
 
 // Global cache to store recently qualified pairs
 const qualifiedCache = {}; // { 'BTCUSDT': timestamp }
@@ -34,9 +34,6 @@ async function findBestTradingPair(exchangeType = 'binancefutures') {
   let bestPick = null;
 
   for (const pair of combinedPairs) {
-    const now = Date.now();
-
-    // Skip if pair was already qualified in the last 1 hour
     if (isRecentlyQualified(pair)) {
       console.log(`⏭️ Skipping ${pair}, already qualified within the last hour.`);
       continue;
@@ -45,22 +42,29 @@ async function findBestTradingPair(exchangeType = 'binancefutures') {
     console.log(`\n📊 Evaluating pair: ${pair}`);
 
     try {
-      const result = await evaluateStrategy(pair);
+      const strategyResult = await evaluateStrategy(pair);
 
-      const qualifies = result.buyScore >= 7 || result.sellScore >= 7;
+      // Get strong support/resistance from order book
+      const marketData = await getAdvancedMarketMakers(pair, 1000, exchangeType, 3, 500);
+      const strongSupport = marketData.strongSupport;
+      const strongResistance = marketData.strongResistance;
+
+      const qualifies = strategyResult.buyScore >= 5 || strategyResult.sellScore >= 5;
 
       if (qualifies) {
-        console.log(`✅ Qualified Pair: ${pair} (Signal: ${result.signal})`);
-        markAsQualified(pair); // cache it
+        console.log(`✅ Qualified Pair: ${pair} (Signal: ${strategyResult.signal})`);
+        markAsQualified(pair);
 
         bestPick = {
           pair,
-          signal: result.signal,
-          score: result.buyScore >= 7 ? result.buyScore : result.sellScore
+          signal: strategyResult.signal,
+          score: strategyResult.buyScore >= 5 ? strategyResult.buyScore : strategyResult.sellScore,
+          strongSupport,
+          strongResistance
         };
         break; // exit after first qualified pair
       } else {
-        console.log(`❌ Pair ${pair} did not meet score threshold (Buy: ${result.buyScore}, Sell: ${result.sellScore})`);
+        console.log(`❌ Pair ${pair} did not meet score threshold (Buy: ${strategyResult.buyScore}, Sell: ${strategyResult.sellScore})`);
       }
     } catch (err) {
       console.error(`⚠️ Error evaluating ${pair}:`, err.message);
@@ -71,10 +75,13 @@ async function findBestTradingPair(exchangeType = 'binancefutures') {
   }
 
   if (bestPick) {
-    console.log(`\n🚀 Selected Pair to Trade: ${bestPick.pair} | Signal: ${bestPick.signal} | Score: ${bestPick.score}`);
+    console.log(`\n🚀 Selected Pair to Trade: ${bestPick.pair}`);
+    console.log(`   Signal: ${bestPick.signal} | Score: ${bestPick.score}`);
+    console.log(`   🟢 Strong Support: ${bestPick.strongSupport ? `${bestPick.strongSupport.price} (Qty=${bestPick.strongSupport.qty})` : 'N/A'}`);
+    console.log(`   🔴 Strong Resistance: ${bestPick.strongResistance ? `${bestPick.strongResistance.price} (Qty=${bestPick.strongResistance.qty})` : 'N/A'}`);
     return bestPick;
   } else {
-    console.log(`⛔ No pair qualified for trading (7+ score).`);
+    console.log(`⛔ No pair qualified for trading (score >=5).`);
     return null;
   }
 }

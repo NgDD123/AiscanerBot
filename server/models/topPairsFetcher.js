@@ -20,7 +20,7 @@ async function fetchOrderBookSpread(baseUrl, symbol) {
     });
     const bids = depthRes.data.bids;
     const asks = depthRes.data.asks;
-    if (!bids.length || !asks.length) return 100; // suspicious if no book
+    if (!bids.length || !asks.length) return 100; // suspicious if no order book
     const bestBid = parseFloat(bids[0][0]);
     const bestAsk = parseFloat(asks[0][0]);
     return ((bestAsk - bestBid) / bestBid) * 100;
@@ -40,7 +40,7 @@ const fetchAutomaticTradingPairs = async (exchangeType) => {
     // ✅ Return cached data if still valid
     if (cache.data && (now - cache.lastFetched < CACHE_DURATION)) {
       console.log('⏳ Returning cached top pairs data...');
-      return cache.data;
+      return cache.data; // returns the object with 3 arrays
     }
 
     // Fetch all tradable perpetual USDT pairs
@@ -60,66 +60,46 @@ const fetchAutomaticTradingPairs = async (exchangeType) => {
       const pairInfo = allPairs.find(pair => pair.symbol === ticker.symbol);
       if (!pairInfo) continue;
 
-      // 1. Check if pair is older than 1 year
       const ageDays = (Date.now() - pairInfo.onboardDate) / (1000 * 60 * 60 * 24);
       if (ageDays < MIN_PAIR_AGE_DAYS) continue;
-
-      // 2. Check if pair has at least 10M USDT daily volume
       if (parseFloat(ticker.quoteVolume) < MIN_VOLUME_USDT) continue;
-
-      // 3. Avoid extreme pump & dump (±50% daily)
       if (Math.abs(parseFloat(ticker.priceChangePercent)) > MAX_DAILY_CHANGE) continue;
-
-      // 4. Require at least 1000 trades per day
       if (parseInt(ticker.count, 10) < MIN_TRADE_COUNT) continue;
 
-      // 5. Check order book spread
       const spread = await fetchOrderBookSpread(baseUrl, ticker.symbol);
       if (spread > MAX_SPREAD_PERCENT) continue;
 
       maturedPairs.push(ticker);
     }
 
-    // 🔥 Top 20 Volatile
+    // 🔹 Combine top symbols from all categories
     const topVolatilePairs = [...maturedPairs]
       .sort((a, b) => Math.abs(b.priceChangePercent) - Math.abs(a.priceChangePercent))
       .slice(0, 20)
       .map(ticker => ticker.symbol);
 
-    // 🚀 Top 20 Gainers
     const topGainerPairs = [...maturedPairs]
       .sort((a, b) => parseFloat(b.priceChangePercent) - parseFloat(a.priceChangePercent))
       .slice(0, 20)
       .map(ticker => ticker.symbol);
 
-    // 💰 Top 20 by Volume
     const topVolumePairs = [...maturedPairs]
       .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
       .slice(0, 20)
       .map(ticker => ticker.symbol);
 
-    const result = {
-      topVolatilePairs,
-      topGainerPairs,
-      topVolumePairs
-    };
-
-    // ✅ Cache result
+    // ✅ Cache result as an object with 3 arrays
     cache = {
-      data: result,
+      data: { topVolatilePairs, topGainerPairs, topVolumePairs },
       lastFetched: now
     };
 
-    console.log(`✅ Fetched ${maturedPairs.length} mature & safe pairs`);
-    return result;
+    console.log(`✅ Fetched ${maturedPairs.length} mature & safe top symbols`);
+    return { topVolatilePairs, topGainerPairs, topVolumePairs };
 
   } catch (error) {
     console.error('❌ Error fetching automatic trading pairs:', error.message);
-    return {
-      topVolatilePairs: [],
-      topGainerPairs: [],
-      topVolumePairs: []
-    };
+    return { topVolatilePairs: [], topGainerPairs: [], topVolumePairs: [] };
   }
 };
 

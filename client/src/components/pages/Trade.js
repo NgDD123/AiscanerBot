@@ -387,7 +387,7 @@ const fetchTopPairsFromBackend = async () => {
 
   const fetchTradingPairs = async () => {
     try {
-      const response = await fetch('${getBaseUrl()}/fapi/v1/exchangeInfo');
+      const response = await fetch(`${getBaseUrl()}/fapi/v1/exchangeInfo`);
       if (!response.ok) {
         throw new Error('Failed to fetch trading pairs');
       }
