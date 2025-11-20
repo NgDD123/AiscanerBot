@@ -55,7 +55,7 @@
     max-width: 500px; /* Larger modal size for desktop screens */
   }
 
-  .modal-content input, 
+  .modal-content input,
   .modal-content button {
     font-size: 1.2rem; /* Increase font size for desktops */
   }
@@ -68,7 +68,7 @@
     max-width: 600px; /* Larger modal size for large screens */
   }
 
-  .modal-content input, 
+  .modal-content input,
   .modal-content button {
     font-size: 1.3rem; /* Larger font size for large screens */
   }

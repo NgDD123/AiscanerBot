@@ -1,9 +1,9 @@
-import React from 'react';
-import './contact.css'
-import withAuth from '../ProtectionHOCs/withAuth';
+import React from "react";
+import "./contact.css";
+import withAuth from "../ProtectionHOCs/withAuth";
 const Contact = () => {
   return (
-    <div className="contact" >
+    <div className="contact">
       <h1>Contact Us</h1>
       <p>
         Need our services? Contact us today to discuss your marketing needs.

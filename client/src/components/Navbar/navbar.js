@@ -40,12 +40,11 @@ const Navbar = () => {
           <li className="text-[#c6c90db9] hover:cursor-pointer font-semibold">
             <Link to="/contact"></Link>
           </li>
-          {(user?.email === "ngiriyezadavid2@gmail.com") && (
+          {user?.email === "ngiriyezadavid2@gmail.com" && (
             <li className="text-[#c6c90db9] hover:cursor-pointer font-semibold">
               <Link to="/admin">Admin</Link>
             </li>
           )}
-
         </div>
 
         <div className="navbar-options">
@@ -68,4 +67,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-

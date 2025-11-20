@@ -27,8 +27,6 @@ const withAuth = (WrappedComponent) => {
       if (userPaymentStatus) {
         setIsPaymentStatusLoaded(true);
       }
-   
-
     }, [userPaymentStatus]);
 
     if (!isUserLoaded) {
@@ -36,19 +34,22 @@ const withAuth = (WrappedComponent) => {
       return <div>Loading user...</div>;
     }
     if (isUserLoaded && location.pathname === "/admin") {
-      if ((user?.email === "ngiriyezadavid2@gmail.com")) {
+      if (user?.email === "ngiriyezadavid2@gmail.com") {
         return <WrappedComponent />;
-      } 
+      }
     }
     if (!isPaymentStatusLoaded && !isUserLoggedOut) {
       // Loading payment status
       return <div className="text-white">Loading payment status...</div>;
     }
     if (isUserLoggedOut) {
-     return <Navigate to={"/login"} />
+      return <Navigate to={"/login"} />;
     }
 
-    if ((user && !userPaymentStatus?.needsToPay) || (user && user?.hasAccess) && Object.keys(userPaymentStatus).length > 0) {
+    if (
+      (user && !userPaymentStatus?.needsToPay) ||
+      (user && user?.hasAccess && Object.keys(userPaymentStatus).length > 0)
+    ) {
       // If the user is authenticated and has paid, render the wrapped component
       return <WrappedComponent {...props} />;
     } else if (user && userPaymentStatus?.needsToPay) {

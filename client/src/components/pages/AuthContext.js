@@ -4,7 +4,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { joinRoom, socket } from "../../config/socketIo";
 import { toast } from "react-toastify";
 import { Navigate } from "react-router-dom";
-import { login } from "../../redux/slice/userSlice"
+import { login } from "../../redux/slice/userSlice";
 import { useDispatch } from "react-redux";
 
 const AuthContext = createContext();
@@ -21,15 +21,16 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         const idTokenResult = await currentUser.getIdTokenResult(true);
-        setUser({ ...currentUser, hasAccess: idTokenResult?.claims?.hasAccess });
+        setUser({
+          ...currentUser,
+          hasAccess: idTokenResult?.claims?.hasAccess,
+        });
         checkUserPaymentStatus(currentUser.uid);
-      }
-      else {
+      } else {
         setUser(null); // Clear user on logout
-        setUserPaymentStatus({})
+        setUserPaymentStatus({});
       }
       setLoading(false);
-
     });
 
     return () => unsubscribe();
@@ -38,15 +39,14 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (user?.uid) {
       socket.connect();
-      joinRoom(user?.email)
+      joinRoom(user?.email);
 
       socket.on("paymentMade", () => {
         toast.success("Payment recorded");
         setTimeout(() => {
-
-          window.location.pathname = "/trade"
-        }, 2000)
-      })
+          window.location.pathname = "/trade";
+        }, 2000);
+      });
     }
 
     socket.on("disconnect", () => {
@@ -73,20 +73,19 @@ export const AuthProvider = ({ children }) => {
       if (auth.currentUser) {
         auth.currentUser.getIdToken().then(async (token) => {
           const response = await fetch(
-            process.env.NODE_ENV === 'production' ?
-              `https://freedombot.online/payment/payment-status` : 'http://localhost:8001/payment/payment-status',
+            process.env.NODE_ENV === "production"
+              ? `https://freedombot.online/payment/payment-status`
+              : "http://localhost:8001/payment/payment-status",
             {
               method: "GET",
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           ).then((response) => response.json());
           setUserPaymentStatus(response);
         });
-
-      }
-      else {
+      } else {
         setUserPaymentStatus(null);
       }
     } catch (error) {
@@ -96,7 +95,13 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, userPaymentStatus, signIn, checkUserPaymentStatus }}
+      value={{
+        user,
+        loading,
+        userPaymentStatus,
+        signIn,
+        checkUserPaymentStatus,
+      }}
     >
       {children}
     </AuthContext.Provider>

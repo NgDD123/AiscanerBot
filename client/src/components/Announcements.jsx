@@ -1,7 +1,7 @@
-import SorryGif from '@/assets/sorry.svg';
-import React, { useState } from 'react';
-import Carousel from 'react-multi-carousel';
-import 'react-multi-carousel/lib/styles.css';
+import SorryGif from "@/assets/sorry.svg";
+import React, { useState } from "react";
+import Carousel from "react-multi-carousel";
+import "react-multi-carousel/lib/styles.css";
 const responsive = {
   mobile: {
     breakpoint: { max: 50000, min: 0 },
@@ -19,7 +19,8 @@ const Announcements = () => {
       <div className="flex flex-col h-[400px]   items-center justify-center gap-4 ">
         <Image src={SorryGif} alt="" className="w-[250px]" />
         <p className="text-sm text-gray-500 text-center ">
-          The Announcements feature is under development. Thank you for your patience!
+          The Announcements feature is under development. Thank you for your
+          patience!
         </p>
       </div>
     </div>

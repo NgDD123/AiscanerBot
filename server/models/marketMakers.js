@@ -30,8 +30,8 @@ async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'bin
     const avgBidSize = allSnapshots.flatMap(s => s.bids).reduce((sum, o) => sum + o.qty, 0) / (allSnapshots.flatMap(s => s.bids).length || 1);
     const avgAskSize = allSnapshots.flatMap(s => s.asks).reduce((sum, o) => sum + o.qty, 0) / (allSnapshots.flatMap(s => s.asks).length || 1);
 
-    const wallThresholdBid = avgBidSize * 5; // 5x average size
-    const wallThresholdAsk = avgAskSize * 5;
+    const wallThresholdBid = avgBidSize * 10; // 5x average size
+    const wallThresholdAsk = avgAskSize * 10;
 
     // Find persistent walls across snapshots
     const persistentLargeBidWalls = [];
@@ -48,28 +48,31 @@ async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'bin
         const count = allSnapshots.filter(s => s.asks.some(o => o.price === ask.price && o.qty >= wallThresholdAsk)).length;
         if (count === snapshots) persistentLargeAskWalls.push(ask);
     });
+    // Function to calculate cumulative volume in a price range
+    const getCumulativeVolume = (walls, range = 0.001) => {
+        return walls.map(wall => {
+            const nearbyQty = walls
+                .filter(o => Math.abs(o.price - wall.price) <= range)
+                .reduce((sum, o) => sum + o.qty, 0);
+            return { ...wall, cumulativeQty: nearbyQty };
+        });
+    };
+    const cumBidWalls = getCumulativeVolume(persistentLargeBidWalls);
+    const cumAskWalls = getCumulativeVolume(persistentLargeAskWalls);
 
     // Strongest Support/Resistance
     let strongSupport = null;
     let strongResistance = null;
 
-    const validSupports = persistentLargeBidWalls.filter(w => w.price <= ltp);
     if (validSupports.length > 0) {
-        strongSupport = validSupports.reduce((max, w) => w.qty > max.qty ? w : max);
+        strongSupport = validSupports.reduce((max, w) => w.cumulativeQty > max.cumulativeQty ? w : max);
     }
-
-    const validResistances = persistentLargeAskWalls.filter(w => w.price >= ltp);
     if (validResistances.length > 0) {
-        strongResistance = validResistances.reduce((max, w) => w.qty > max.qty ? w : max);
+        strongResistance = validResistances.reduce((max, w) => w.cumulativeQty > max.cumulativeQty ? w : max);
     }
 
-    // Console output only strongest levels
-    if (strongSupport) {
-        console.log(`🟢 STRONG Support @ ${strongSupport.price} (Qty=${strongSupport.qty})`);
-    }
-    if (strongResistance) {
-        console.log(`🔴 STRONG Resistance @ ${strongResistance.price} (Qty=${strongResistance.qty})`);
-    }
+    if (strongSupport) console.log(`🟢 STRONG Support @ ${strongSupport.price} (CumQty=${strongSupport.cumulativeQty})`);
+    if (strongResistance) console.log(`🔴 STRONG Resistance @ ${strongResistance.price} (CumQty=${strongResistance.cumulativeQty})`);
 
     return {
         bids: lastSnapshot.bids,

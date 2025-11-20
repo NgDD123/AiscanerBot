@@ -11,7 +11,7 @@
   padding: 0 20px;
 }
 
-.footer-section h3, 
+.footer-section h3,
 .footer-section h4 {
   font-style: italic;
   font-family: Arial, Helvetica, sans-serif;
@@ -77,9 +77,9 @@
     font-size: 16px;
   }
 
-  .massege, 
-  .About1, 
-  .Bot1, 
+  .massege,
+  .About1,
+  .Bot1,
   .Sgnals {
     font-size: 12px;
     color: yellow;
@@ -105,9 +105,9 @@
     padding-top: 0.5rem;
   }
 
-  .massege, 
-  .About1, 
-  .Bot1, 
+  .massege,
+  .About1,
+  .Bot1,
   .Sgnals {
     font-size: 12px;
     margin: 0;

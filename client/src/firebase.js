@@ -1,7 +1,15 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import {getAuth} from "firebase/auth";
-import { getFirestore, collection, getDocs, updateDoc, doc,addDoc,deleteDoc } from 'firebase/firestore';
+import { getAuth } from "firebase/auth";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  updateDoc,
+  doc,
+  addDoc,
+  deleteDoc,
+} from "firebase/firestore";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -14,11 +22,11 @@ const firebaseConfig = {
   storageBucket: "freedmobot.appspot.com",
   messagingSenderId: "942901798475",
   appId: "1:942901798475:web:b183eeb81c7448b8e4cfce",
-  measurementId: "G-9HEGS6ZEWQ"
+  measurementId: "G-9HEGS6ZEWQ",
 };
 
 // Initialize Firebase
-const app = initializeApp (firebaseConfig);
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-export { db, auth, collection, getDocs, updateDoc, doc,addDoc,deleteDoc };
+export { db, auth, collection, getDocs, updateDoc, doc, addDoc, deleteDoc };

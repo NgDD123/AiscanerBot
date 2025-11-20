@@ -49,7 +49,6 @@
   position: absolute; /* Position the image absolutely */
   top: 220px; /* Align to the top */
   left: 200px;
-   
 }
 
 .exchangeType {
@@ -57,11 +56,11 @@
   padding: 2px;
   flex-direction: column;
   width: 40%;
-  .Exchange{
+  .Exchange {
     background-color: blue;
     color: white;
   }
-  .option{
+  .option {
     position: absolute;
     top: 280px;
     left: 200;
@@ -76,7 +75,6 @@
   width: 170px;
   background-color: blue;
   color: white;
- 
 }
 
 .TradingOption {
@@ -88,12 +86,11 @@
   display: flex;
   padding: 2px;
   flex-direction: column;
-  .oders{
+  .oders {
     background-color: blue;
     color: white;
-
   }
-  .paire{
+  .paire {
     background-color: blue;
     color: white;
   }
@@ -110,12 +107,12 @@
   top: 490px; /* Align to the top */
   left: 200px; /* Align to the right */
   border: 1px solid white; /* Add border for visibility */
-  padding: 10px; 
+  padding: 10px;
   height: 200px;
   font-size: 12px;
 }
 
-.Account-content { 
+.Account-content {
   margin-left: 0;
   margin: 0;
   right: 0;
@@ -135,59 +132,67 @@ button {
 }
 /* Responsive design for tablets */
 @media (max-width: 1024px) {
-.trade {
+  .trade {
     font-size: calc(8px + 2vmin);
-}
-.trading-bot-image img {
+  }
+  .trading-bot-image img {
     width: 250px;
     height: 375px;
-}
-.apiKey, .exchangeType, .connectBtt, .TradingOption, .Account {
+  }
+  .apiKey,
+  .exchangeType,
+  .connectBtt,
+  .TradingOption,
+  .Account {
     position: static;
     width: 85%;
     margin: 15px auto;
-}
-.Account {
+  }
+  .Account {
     height: auto;
-}
-button {
+  }
+  button {
     width: 100%;
-}
+  }
 }
 
 /* Responsive design for Android phones */
 @media (max-width: 600px) {
-.botTitle {
+  .botTitle {
     font-size: 50px;
-}
-.trading-bot-image img {
+  }
+  .trading-bot-image img {
     width: 100%;
     height: auto;
-}
-.apiKey, .exchangeType, .connectBtt, .TradingOption, .Account {
+  }
+  .apiKey,
+  .exchangeType,
+  .connectBtt,
+  .TradingOption,
+  .Account {
     position: static;
     width: 90%;
     margin: 10px auto;
-}
-.Account {
+  }
+  .Account {
     width: 100%;
     height: auto;
-}
-.Account-content {
+  }
+  .Account-content {
     align-items: flex-start;
-}
-button {
+  }
+  button {
     width: 100%;
-}
+  }
 }
 
 /* Responsive design for larger screens */
 @media (min-width: 1200px) {
-.trade {
+  .trade {
     font-size: calc(12px + 2vmin);
-}
-.trading-bot-image img {
+  }
+  .trading-bot-image img {
     width: 350px;
     height: 525px;
-}
+  }
 }

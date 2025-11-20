@@ -1,14 +1,14 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import React from "react";
+import ReactDOM from "react-dom/client";
 import "@mantine/core/styles.css";
-import './index.css';
-import App from './App';
-import reportWebVitals from './reportWebVitals';
-import { PersistGate } from 'redux-persist/integration/react';
-import { persistor, store } from './redux/store';
-import { Provider } from 'react-redux';
+import "./index.css";
+import App from "./App";
+import reportWebVitals from "./reportWebVitals";
+import { PersistGate } from "redux-persist/integration/react";
+import { persistor, store } from "./redux/store";
+import { Provider } from "react-redux";
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
     <PersistGate persistor={persistor} loading={<div>Loading...</div>}>
@@ -16,8 +16,7 @@ root.render(
         <App />
       </Provider>
     </PersistGate>
-
-  </React.StrictMode>
+  </React.StrictMode>,
 );
 
 reportWebVitals();
