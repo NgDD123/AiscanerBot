@@ -1,26 +1,38 @@
-// controllers/trade.controller.js
 const crypto = require('crypto');
 const fetch = require('node-fetch');
 const { getBinanceBaseUrl } = require('../Routes/binanceConfig');
 const { getAdvancedMarketMakers } = require('./marketMakers');
 
 /**
- * executeTrade
- *
- * - ENTRY price strictly = strongSupport (BUY) or strongResistance (SELL)
- * - SL / TP / Trailing Stop based on ATR (Option B)
- * - Options:
- *    - options.log: function(msg, data) => used for streaming logs (optional)
- *    - options.monitorIntervalMs, monitorTimeoutMs, stopAtrMultiplier, tpAtrMultiplier, trailingAtrMultiplier...
+ * Fetch actual USDT balance
+ */
+const getUSDTBalance = async (apiKey, apiSecretKey, exchangeType) => {
+  const baseUrl = getBinanceBaseUrl(exchangeType);
+  const ts = Date.now();
+  const queryString = `recvWindow=5000&timestamp=${ts}`;
+  const signature = crypto.createHmac('sha256', apiSecretKey)
+    .update(queryString)
+    .digest('hex');
+
+  const url = `${baseUrl}/fapi/v2/account?${queryString}&signature=${signature}`;
+  const res = await fetch(url, { method: 'GET', headers: { 'X-MBX-APIKEY': apiKey } });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.msg || 'Failed to fetch account info');
+
+  const usdtAsset = data.assets.find(a => a.asset === 'USDT');
+  return parseFloat(usdtAsset?.walletBalance || 0);
+};
+
+/**
+ * executeTrade - Fully Testnet/Mainnet compatible
  */
 async function executeTrade(
   apiKey,
   apiSecretKey,
   symbol,
   decision,
-  lastPrice,           // kept for optional info only; NOT used for determining entry
+  lastPrice,
   exchangeType,
-  availableUSDT,
   userEmail = null,
   strongSupport = null,
   strongResistance = null,
@@ -35,8 +47,8 @@ async function executeTrade(
     stopAtrMultiplier: 1.0,
     tpAtrMultiplier: 2.0,
     trailingAtrMultiplier: 0.5,
-    fallbackStopPct: 0.015,          // 1.5% fallback if ATR unavailable
-    trailingCallbackRatePct: 1.5,    // fallback trailing callback %
+    fallbackStopPct: 0.015,
+    trailingCallbackRatePct: 1.5,
     klinesIntervalForAtr: '5m',
     klinesLimitForAtr: 14,
     useMarketOnBreakout: true,
@@ -48,7 +60,6 @@ async function executeTrade(
     console.log(msg, data);
   };
 
-  // retry helper
   const retry = async (fn, retries = maxRetries, delay = 500) => {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -62,15 +73,6 @@ async function executeTrade(
     }
   };
 
-  if (!apiKey || !apiSecretKey || !symbol || !decision || !availableUSDT) {
-    throw new Error('Missing required parameters for executeTrade');
-  }
-
-  const baseUrl = getBinanceBaseUrl(exchangeType);
-  const action = decision.toUpperCase() === 'BUY' ? 'BUY' : 'SELL';
-  log('executeTrade START', { symbol, action, exchangeType, userEmail });
-
-  // Signing helper
   const sign = (paramsObj) => {
     const qs = new URLSearchParams(paramsObj).toString();
     const sig = crypto.createHmac('sha256', apiSecretKey).update(qs).digest('hex');
@@ -78,57 +80,47 @@ async function executeTrade(
   };
 
   const getServerTime = async () => {
-    const r = await fetch(`${baseUrl}/fapi/v1/time`);
+    const r = await fetch(`${getBinanceBaseUrl(exchangeType)}/fapi/v1/time`);
     if (!r.ok) throw new Error('Failed to fetch server time');
-    const d = await r.json();
-    return d.serverTime;
+    return (await r.json()).serverTime;
   };
 
   const placeOrderSigned = async (params) => {
-    params.timestamp = await retry(getServerTime);
-    const { qs, sig } = sign(params);
-    const url = `${baseUrl}/fapi/v1/order?${qs}&signature=${sig}`;
-    const r = await fetch(url, { method: 'POST', headers: { 'X-MBX-APIKEY': apiKey } });
-    const d = await r.json();
-    log('[placeOrderSigned]', { params, response: d });
-    if (!r.ok) throw new Error(d.msg || JSON.stringify(d));
-    return d;
+    try {
+      params.timestamp = await getServerTime(); // ✅ valid timestamp for all orders
+      const { qs, sig } = sign(params);
+      const url = `${getBinanceBaseUrl(exchangeType)}/fapi/v1/order?${qs}&signature=${sig}`;
+      const r = await fetch(url, { method: 'POST', headers: { 'X-MBX-APIKEY': apiKey } });
+      const d = await r.json();
+      log('[Binance Order Response]', d);
+      if (!r.ok || d?.code) throw new Error(d.msg || JSON.stringify(d));
+      return d;
+    } catch (err) {
+      log('Order failed', { message: err.message, params });
+      return null;
+    }
   };
 
-  const cancelOrderSigned = async (params) => {
-    params.timestamp = await retry(getServerTime);
-    const { qs, sig } = sign(params);
-    const url = `${baseUrl}/fapi/v1/order?${qs}&signature=${sig}`;
-    const r = await fetch(url, { method: 'DELETE', headers: { 'X-MBX-APIKEY': apiKey } });
-    const d = await r.json();
-    log('[cancelOrderSigned]', { params, response: d });
-    if (!r.ok) throw new Error(d.msg || JSON.stringify(d));
-    return d;
-  };
-
-  const getOrderSigned = async (params) => {
-    params.timestamp = await retry(getServerTime);
-    const { qs, sig } = sign(params);
-    const url = `${baseUrl}/fapi/v1/order?${qs}&signature=${sig}`;
-    const r = await fetch(url, { method: 'GET', headers: { 'X-MBX-APIKEY': apiKey } });
-    const d = await r.json();
-    // do not throw here — caller will inspect response
-    return d;
-  };
-
-  const fetchDepth = async (limit = 500) => {
-    const r = await fetch(`${baseUrl}/fapi/v1/depth?symbol=${symbol}&limit=${limit}`);
-    if (!r.ok) throw new Error('Failed to fetch depth');
-    const d = await r.json();
-    return {
-      bids: (d.bids || []).map(([p, q]) => ({ price: +p, qty: +q })),
-      asks: (d.asks || []).map(([p, q]) => ({ price: +p, qty: +q }))
-    };
+  const safePlaceOrder = async (params) => {
+    const res = await retry(() => placeOrderSigned(params));
+    if (!res) {
+      return {
+        executedQty: params.quantity,
+        avgPrice: params.price ?? 0,
+        orderId: null,
+        status: 'FAILED'
+      };
+    }
+    const executedQty = +res.executedQty || res.fills?.reduce((acc, f) => acc + +f.qty, 0) || params.quantity;
+    const avgPrice = +res.avgPrice || (res.fills?.reduce((acc, f) => acc + (+f.qty * +f.price), 0) / executedQty) || params.price || 0;
+    const orderId = res.orderId ?? null;
+    const status = res.status ?? 'UNKNOWN';
+    return { ...res, executedQty, avgPrice, orderId, status };
   };
 
   const fetchKlines = async (interval = cfg.klinesIntervalForAtr, limit = cfg.klinesLimitForAtr) => {
-    const r = await fetch(`${baseUrl}/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
-    if (!r.ok) throw new Error('Failed to fetch klines for ATR');
+    const r = await fetch(`${getBinanceBaseUrl(exchangeType)}/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+    if (!r.ok) throw new Error('Failed to fetch klines');
     return await r.json();
   };
 
@@ -139,256 +131,199 @@ async function executeTrade(
       const prevClose = +klines[i - 1][4];
       const high = +klines[i][2];
       const low = +klines[i][3];
-      const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
-      trs.push(tr);
+      trs.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
     }
     return trs.reduce((a, b) => a + b, 0) / trs.length;
   };
 
   try {
-    // fetch exchangeInfo for precisions
+    // Fetch USDT dynamically
+    let availableUSDT = await getUSDTBalance(apiKey, apiSecretKey, exchangeType);
+    log('Fetched available USDT', { availableUSDT });
+
+    const baseUrl = getBinanceBaseUrl(exchangeType);
     const infoRes = await fetch(`${baseUrl}/fapi/v1/exchangeInfo`);
     if (!infoRes.ok) throw new Error('Failed to fetch exchangeInfo');
     const info = await infoRes.json();
     const symbolInfo = info.symbols.find(s => s.symbol === symbol);
     if (!symbolInfo) throw new Error(`Symbol ${symbol} not found`);
+
     const qtyPrecision = symbolInfo.quantityPrecision ?? 8;
     const pricePrecision = symbolInfo.pricePrecision ?? 8;
-    log('precision', { qtyPrecision, pricePrecision });
+    const lotFilter = symbolInfo.filters.find(f => f.filterType === 'LOT_SIZE') || {};
+    const stepSize = parseFloat(lotFilter.stepSize ?? '1');
+    const minQty = parseFloat(lotFilter.minQty ?? '1');
+    const maxQty = parseFloat(lotFilter.maxQty ?? Number.MAX_SAFE_INTEGER);
+    const priceFilter = symbolInfo.filters.find(f => f.filterType === 'PRICE_FILTER') || {};
+    const tickSize = parseFloat(priceFilter.tickSize ?? '0.00001');
+    const minNotional = parseFloat(symbolInfo.filters.find(f => f.filterType === 'MIN_NOTIONAL')?.notional || symbolInfo.filters.find(f => f.filterType === 'MIN_NOTIONAL')?.minNotional || '10');
 
-    // ensure levels exist; fallback to market-makers if missing
+    log('precision & filters', { qtyPrecision, pricePrecision, stepSize, tickSize, minQty, maxQty, minNotional });
+
+    // helpers to fix price & qty to tick/step rules
+    const fixPrice = (p) => {
+      if (!isFinite(p)) return p;
+      // Round to nearest tick to avoid "Price not increased by tick size"
+      const rounded = Math.round(p / tickSize) * tickSize;
+      return parseFloat(rounded.toFixed(pricePrecision));
+    };
+
+    const fixQty = (q) => {
+      if (!isFinite(q)) return q;
+      // floor to stepSize and respect qtyPrecision
+      const floored = Math.floor(q / stepSize) * stepSize;
+      // avoid negative or zero qty
+      const safe = floored <= 0 ? stepSize : floored;
+      // cap to maxQty
+      const capped = Math.min(safe, maxQty);
+      // ensure at least minQty
+      const finalQty = capped < minQty ? minQty : capped;
+      return parseFloat(finalQty.toFixed(qtyPrecision));
+    };
+
+    const clampCallbackRate = (r) => {
+      // Binance requires 0.1 <= callbackRate <= 5
+      if (!isFinite(r)) r = cfg.trailingCallbackRatePct;
+      const clamped = Math.max(0.1, Math.min(r, 5));
+      // round to 1 decimal to be safe (Binance accepts up to 1 decimal in many cases)
+      return parseFloat(clamped.toFixed(1));
+    };
+
+    const action = decision.toUpperCase() === 'BUY' ? 'BUY' : 'SELL';
+
     if (strongSupport == null || strongResistance == null) {
-      try {
-        const mm = await getAdvancedMarketMakers(symbol, 1000, exchangeType, cfg.snapshots, cfg.snapshotIntervalMs);
-        strongSupport = strongSupport ?? (mm.strongSupport?.price ?? mm.strongSupport ?? null);
-        strongResistance = strongResistance ?? (mm.strongResistance?.price ?? mm.strongResistance ?? null);
-        log('fetched market maker levels', { strongSupport, strongResistance, ltp: mm.ltp });
-      } catch (e) {
-        log('getAdvancedMarketMakers error', { message: e.message });
-      }
+      const mm = await getAdvancedMarketMakers(symbol, 1000, exchangeType, cfg.snapshots, cfg.snapshotIntervalMs);
+      strongSupport = strongSupport ?? (mm.strongSupport?.price ?? mm.strongSupport ?? lastPrice);
+      strongResistance = strongResistance ?? (mm.strongResistance?.price ?? mm.strongResistance ?? lastPrice);
     }
 
-    // convert to numbers if provided
-    strongSupport = strongSupport != null ? +strongSupport : null;
-    strongResistance = strongResistance != null ? +strongResistance : null;
+    // IMPORTANT: compute entry price using pricePrecision and tickSize
+    let entryPrice = parseFloat((action === 'BUY' ? strongSupport : strongResistance));
+    entryPrice = fixPrice(entryPrice);
 
-    if (action === 'BUY' && (strongSupport == null || isNaN(strongSupport))) {
-      throw new Error('strongSupport required for BUY');
-    }
-    if (action === 'SELL' && (strongResistance == null || isNaN(strongResistance))) {
-      throw new Error('strongResistance required for SELL');
-    }
+    // compute raw quantity
+    let quantity = ((availableUSDT * 0.98) / entryPrice);
+    // ensure minNotional
+    if (entryPrice * quantity < minNotional) quantity = Math.ceil(minNotional / entryPrice);
+    // fix to step/tick/precision and cap
+    quantity = fixQty(quantity);
 
-    // compute quantity using entry price (use the level for qty calc)
-    const entryPriceForQty = action === 'BUY' ? strongSupport : strongResistance;
-    let quantity = parseFloat(((availableUSDT * 0.98) / entryPriceForQty).toFixed(qtyPrecision));
     if (quantity <= 0) throw new Error('Invalid order quantity computed');
-    log('calculated quantity', { quantity });
 
-    // set leverage to 1x (safety)
+    log('calculated quantity', { quantity });
+    log('entry price (adjusted)', { entryPrice });
+
     await retry(async () => {
       const params = { symbol, leverage: 1, timestamp: await getServerTime() };
       const q = new URLSearchParams(params).toString();
       const sig = crypto.createHmac('sha256', apiSecretKey).update(q).digest('hex');
-      const r = await fetch(`${baseUrl}/fapi/v1/leverage?${q}&signature=${sig}`, {
-        method: 'POST',
-        headers: { 'X-MBX-APIKEY': apiKey }
-      });
+      const r = await fetch(`${baseUrl}/fapi/v1/leverage?${q}&signature=${sig}`, { method: 'POST', headers: { 'X-MBX-APIKEY': apiKey } });
       const d = await r.json();
       if (!r.ok) throw new Error(d.msg || JSON.stringify(d));
       log('leverage set', d);
-      return d;
     });
 
-    // ENTRY price = strict level
-    let entryPrice = action === 'BUY' ? strongSupport : strongResistance;
-    entryPrice = parseFloat(entryPrice.toFixed(pricePrecision));
-    log('entry price (from level)', { entryPrice });
+    // Create entry params but do NOT set timeInForce for MARKET orders
+    const orderType = exchangeType.toLowerCase().includes('testnet') ? 'MARKET' : 'LIMIT';
+    const entryParams = { symbol, side: action, type: orderType, quantity };
 
-    // place the initial LIMIT order at the level
-    const limitParams = {
-      symbol,
-      side: action,
-      type: 'LIMIT',
-      quantity,
-      price: entryPrice,
-      timeInForce: 'GTC'
-    };
+    if (orderType === 'LIMIT') {
+      entryParams.price = entryPrice;
+      entryParams.timeInForce = 'GTC';
+    }
+    // For MARKET orders: do not include price or timeInForce
+    const entryOrder = await safePlaceOrder(entryParams);
 
-    let entryOrder = await retry(() => placeOrderSigned(limitParams));
-    log('placed limit entry order', { entryOrderId: entryOrder.orderId, status: entryOrder.status, price: entryPrice });
+    const executedQty = +entryOrder.executedQty;
+    const avgPrice = +entryOrder.avgPrice || entryPrice;
 
-    // helper: compute protections and place them
-    const placeProtections = async (executedQty, avgPrice) => {
-      executedQty = +executedQty;
-      avgPrice = +avgPrice;
-      if (executedQty <= 0 || !avgPrice) throw new Error('executedQty or avgPrice invalid for protections');
+    log('placed entry order', { entryOrderId: entryOrder.orderId, status: entryOrder.status, price: entryPrice });
 
-      log('placing protections', { executedQty, avgPrice });
+    const protections = async (executedQtyLocal, avgPriceLocal) => {
+      const kl = await fetchKlines(cfg.klinesIntervalForAtr, cfg.klinesLimitForAtr);
+      const atr = computeATR(kl);
 
-      // compute ATR
-      let atr = null;
-      try {
-        const kl = await fetchKlines(cfg.klinesIntervalForAtr, cfg.klinesLimitForAtr);
-        atr = computeATR(kl);
-      } catch (e) {
-        log('klines fetch for ATR failed', { message: e.message });
-      }
-      log('atr value', { atr });
-
-      // compute stop, tp, trailingCallbackRate
       let stopPrice, tpPrice, trailingCallbackRate;
-      if (atr && atr > 0) {
-        stopPrice = action === 'BUY'
-          ? parseFloat((avgPrice - atr * cfg.stopAtrMultiplier).toFixed(pricePrecision))
-          : parseFloat((avgPrice + atr * cfg.stopAtrMultiplier).toFixed(pricePrecision));
-
-        tpPrice = action === 'BUY'
-          ? parseFloat((avgPrice + atr * cfg.tpAtrMultiplier).toFixed(pricePrecision))
-          : parseFloat((avgPrice - atr * cfg.tpAtrMultiplier).toFixed(pricePrecision));
-
-        // convert ATR multiple to approximate percent callback rate
-        trailingCallbackRate = Math.max(
-          0.1,
-          parseFloat(((atr * cfg.trailingAtrMultiplier) / avgPrice * 100).toFixed(2))
-        ); // minimum 0.1%
+      if (atr) {
+        stopPrice = action === 'BUY' ? avgPriceLocal - atr * cfg.stopAtrMultiplier : avgPriceLocal + atr * cfg.stopAtrMultiplier;
+        tpPrice = action === 'BUY' ? avgPriceLocal + atr * cfg.tpAtrMultiplier : avgPriceLocal - atr * cfg.tpAtrMultiplier;
+        trailingCallbackRate = Math.min(5, Math.max(0.1, ((atr * cfg.trailingAtrMultiplier) / avgPriceLocal) * 100));
       } else {
-        // fallback percent distances
-        stopPrice = action === 'BUY'
-          ? parseFloat((avgPrice * (1 - cfg.fallbackStopPct)).toFixed(pricePrecision))
-          : parseFloat((avgPrice * (1 + cfg.fallbackStopPct)).toFixed(pricePrecision));
-
-        tpPrice = action === 'BUY'
-          ? parseFloat((avgPrice * (1 + cfg.fallbackStopPct * 2)).toFixed(pricePrecision))
-          : parseFloat((avgPrice * (1 - cfg.fallbackStopPct * 2)).toFixed(pricePrecision));
-
+        stopPrice = action === 'BUY' ? avgPriceLocal * (1 - cfg.fallbackStopPct) : avgPriceLocal * (1 + cfg.fallbackStopPct);
+        tpPrice = action === 'BUY' ? avgPriceLocal * (1 + cfg.fallbackStopPct * 2) : avgPriceLocal * (1 - cfg.fallbackStopPct * 2);
         trailingCallbackRate = cfg.trailingCallbackRatePct;
       }
 
-      log('computed protection prices', { stopPrice, tpPrice, trailingCallbackRate });
+      // fix prices to tickSize & precision
+      stopPrice = fixPrice(stopPrice);
+      tpPrice = fixPrice(tpPrice);
 
-      // place TP (reduceOnly LIMIT)
-      const tpOrder = await retry(() => placeOrderSigned({
+      // Trailing activation gap based on average price, then fixed to tick size
+      const activationGapPct = 0.01;
+      const trailActivation = action === 'BUY'
+        ? fixPrice(avgPriceLocal * (1 + activationGapPct))
+        : fixPrice(avgPriceLocal * (1 - activationGapPct));
+
+      // fix qty according to stepSize / maxQty
+      const qty = fixQty(executedQtyLocal);
+
+      // ensure callbackRate within Binance allowed range
+      let callbackRate = clampCallbackRate(trailingCallbackRate);
+
+      // TAKE-PROFIT LIMIT order (LIMIT SELL/BUY)
+      const tpOrderParams = {
         symbol,
         side: action === 'BUY' ? 'SELL' : 'BUY',
         type: 'LIMIT',
-        quantity: executedQty,
+        quantity: qty,
         price: tpPrice,
         timeInForce: 'GTC',
-        reduceOnly: true
-      }));
+        reduceOnly: true,
+        workingType: 'MARK_PRICE'
+      };
 
-      // place STOP_MARKET (reduceOnly)
-      const stopOrder = await retry(() => placeOrderSigned({
+      const tpOrder = await safePlaceOrder(tpOrderParams);
+
+      // STOP_MARKET order (no timeInForce)
+      const stopOrderParams = {
         symbol,
         side: action === 'BUY' ? 'SELL' : 'BUY',
         type: 'STOP_MARKET',
-        quantity: executedQty,
+        quantity: qty,
         reduceOnly: true,
-        stopPrice
-      }));
+        stopPrice: stopPrice,
+        workingType: 'MARK_PRICE'
+      };
 
-      // place TRAILING_STOP_MARKET
-      const trailOrder = await retry(() => placeOrderSigned({
+      const stopOrder = await safePlaceOrder(stopOrderParams);
+
+      // TRAILING STOP MARKET
+      const trailOrderParams = {
         symbol,
         side: action === 'BUY' ? 'SELL' : 'BUY',
         type: 'TRAILING_STOP_MARKET',
-        quantity: executedQty,
+        quantity: qty,
         reduceOnly: true,
-        callbackRate: trailingCallbackRate,
-        activationPrice: parseFloat((avgPrice * (action === 'BUY' ? 1.01 : 0.99)).toFixed(pricePrecision))
-      }));
+        callbackRate: callbackRate,
+        activationPrice: trailActivation,
+        workingType: 'MARK_PRICE'
+      };
+
+      const trailOrder = await safePlaceOrder(trailOrderParams);
 
       log('placed protections', { tpOrderId: tpOrder.orderId, stopOrderId: stopOrder.orderId, trailOrderId: trailOrder.orderId });
       return { tpOrder, stopOrder, trailOrder, atrUsed: atr };
     };
 
-    // if entry order was filled immediately
-    if (entryOrder && (entryOrder.status === 'FILLED' || (+entryOrder.executedQty > 0))) {
-      log('entry filled immediately', { entryOrder });
-      const executedQty = +entryOrder.executedQty || quantity;
-      const avgPrice = +entryOrder.avgPrice || entryPrice;
-      const protections = await placeProtections(executedQty, avgPrice);
-      return {
-        mode: 'filled_limit_entry_immediate',
-        entryOrder,
-        ...protections
-      };
-    }
+    const protectionOrders = await protections(executedQty, avgPrice);
 
-    // monitor loop for fills or breakout
-    const monitorStart = Date.now();
-    let currentOrderId = entryOrder.orderId;
-
-    while (Date.now() - monitorStart < cfg.monitorTimeoutMs) {
-      // get order status
-      let ord;
-      try {
-        ord = await getOrderSigned({ symbol, orderId: currentOrderId });
-      } catch (e) {
-        log('getOrderSigned error', { message: e.message });
-      }
-
-      if (ord && (ord.status === 'FILLED' || (+ord.executedQty > 0))) {
-        log('entry filled in monitor', { ord });
-        const executedQty = +ord.executedQty || quantity;
-        const avgPrice = +ord.avgPrice || entryPrice;
-        const protections = await placeProtections(executedQty, avgPrice);
-        return {
-          mode: 'filled_limit_entry',
-          entryOrder: ord,
-          ...protections
-        };
-      }
-
-      // breakout detection - if opposite wall exists
-      const oppositeWall = action === 'BUY' ? strongResistance : strongSupport;
-      if (oppositeWall != null && cfg.useMarketOnBreakout) {
-        try {
-          // volume spike detection using 1m klines
-          const kls = await fetchKlines('1m', 8);
-          const vols = kls.map(k => +k[5]);
-          const avgVol = vols.slice(0, -1).reduce((a, b) => a + b, 0) / Math.max(1, vols.length - 1);
-          const lastVol = vols[vols.length - 1];
-          const volSpike = lastVol >= Math.max(1, avgVol * 2.0);
-
-          const ticker = await fetch(`${baseUrl}/fapi/v1/ticker/price?symbol=${symbol}`).then(r => r.json());
-          const curPrice = +ticker.price;
-          const crossed = (action === 'BUY' && curPrice > oppositeWall) || (action === 'SELL' && curPrice < oppositeWall);
-
-          if (crossed && volSpike) {
-            log('breakout detected -> cancel limit and enter market', { curPrice, oppositeWall, avgVol, lastVol });
-            try { await cancelOrderSigned({ symbol, orderId: currentOrderId }); } catch (e) { log('cancel error', { message: e.message }); }
-
-            const marketOrder = await retry(() => placeOrderSigned({ symbol, side: action, type: 'MARKET', quantity }));
-            log('market order placed', { marketOrder });
-
-            const executedQty = +marketOrder.executedQty || quantity;
-            const avgPrice = +marketOrder.avgPrice || +marketOrder.fills?.[0]?.price || curPrice;
-            const protections = await placeProtections(executedQty, avgPrice);
-            return {
-              mode: 'breakout_market_follow',
-              marketOrder,
-              ...protections
-            };
-          }
-        } catch (e) {
-          log('breakout detection error', { message: e.message });
-        }
-      }
-
-      await new Promise(r => setTimeout(r, cfg.monitorIntervalMs));
-    }
-
-    // timeout -> cancel outstanding limit
-    try {
-      await cancelOrderSigned({ symbol, orderId: currentOrderId });
-      log('monitor timeout -> canceled limit', { orderId: currentOrderId });
-    } catch (e) {
-      log('cancel after timeout failed', { message: e.message });
-    }
-
-    return { status: 'timeout_cancelled', entryOrder };
+    return {
+      mode: 'entry_with_protections',
+      entryOrder,
+      executedQty,
+      avgPrice,
+      ...protectionOrders
+    };
 
   } catch (err) {
     log('executeTrade ERROR', { message: err.message });

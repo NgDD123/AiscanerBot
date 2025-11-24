@@ -49,7 +49,7 @@ async function findBestTradingPair(exchangeType = 'binancefutures') {
       const strongSupport = marketData.strongSupport;
       const strongResistance = marketData.strongResistance;
 
-      const qualifies = strategyResult.buyScore >= 5 || strategyResult.sellScore >= 5;
+      const qualifies = strategyResult.buyScore >= 4 || strategyResult.sellScore >= 4;
 
       if (qualifies) {
         console.log(`✅ Qualified Pair: ${pair} (Signal: ${strategyResult.signal})`);
@@ -58,7 +58,7 @@ async function findBestTradingPair(exchangeType = 'binancefutures') {
         bestPick = {
           pair,
           signal: strategyResult.signal,
-          score: strategyResult.buyScore >= 5 ? strategyResult.buyScore : strategyResult.sellScore,
+          score: strategyResult.buyScore >= 4 ? strategyResult.buyScore : strategyResult.sellScore,
           strongSupport,
           strongResistance
         };

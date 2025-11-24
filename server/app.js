@@ -555,77 +555,36 @@ async function closePosition(symbol, apiKey, apiSecretKey, exchangeType) {
         throw error.response ? error.response.data : error;
     }
 }
-
-app.post('/api/close-position', async (req, res) => {
-    try {
-        const { symbol, positionSide } = req.body;
-        const apiKey = req.headers['x-api-key'];
-        const apiSecretKey = req.headers['x-api-secret-key'];
-        const exchangeType = req.headers['x-exchange-type'];
-
-        if (!apiKey || !apiSecretKey || !exchangeType || !symbol || !positionSide) {
-            return res.status(400).json({ error: 'Missing required parameters' });
-        }
-
-        const baseUrl = getBinanceBaseUrl(exchangeType);
-        const timestamp = Date.now();
-        const query = `symbol=${symbol}&side=${positionSide === 'LONG' ? 'SELL' : 'BUY'}&type=MARKET&positionSide=${positionSide}&quantity=0.1&timestamp=${timestamp}`;
-        const signature = sign(query, apiSecretKey);
-        const url = `${baseUrl}/fapi/v1/order?${query}&signature=${signature}`;
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'X-MBX-APIKEY': apiKey
-            }
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.msg || 'Failed to close position');
-        }
-
-        res.json({ success: true, data });
-    } catch (error) {
-        console.error('Error in /api/close-position:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-
-
-// route:
 app.post('/api/execute-trade', async (req, res) => {
   console.log("------ [DEBUG] /api/execute-trade ROUTE CALLED ------");
 
   try {
-    const { apiKey, apiSecretKey, symbol, tradeDecision, options } = req.body;
-    let { exchangeType, strongSupport, strongResistance } = req.body;
-    const userEmail = req.headers['x-user-email'] || null;
+    const { apiKey, apiSecretKey, symbol, tradeDecision, exchangeType, options } = req.body;
+    
 
-    console.log("[DEBUG] Incoming Body:", { symbol, tradeDecision, strongSupport, strongResistance, options });
-    console.log("[DEBUG] Incoming Headers: x-user-email =", userEmail);
+    console.log("[DEBUG] Incoming Body:", { symbol, tradeDecision, exchangeType, options });
+   
 
     if (!apiKey || !apiSecretKey || !symbol || !exchangeType) {
       return res.status(400).json({ error: 'API key, secret, symbol, or exchange type not provided' });
     }
 
-    if (!tradeDecision) return res.status(400).json({ error: 'tradeDecision is required (Buy / Sell / Hold)' });
-
-    exchangeType = exchangeType.toLowerCase().trim();
-    if (!['binance', 'binancefutures', 'binancefuturestestnet', 'binancetestnet'].includes(exchangeType)) {
-      return res.status(400).json({ error: 'Invalid exchange type provided', received: exchangeType });
+    const exType = exchangeType.toLowerCase().trim();
+    if (!['binance', 'binancefutures', 'binancefuturestestnet', 'binancetestnet'].includes(exType)) {
+      return res.status(400).json({ error: 'Invalid exchange type provided', received: exType });
     }
 
+    if (!tradeDecision) {
+      return res.status(400).json({ error: 'tradeDecision is required (Buy / Sell / Hold)' });
+    }
     if (tradeDecision.toLowerCase() === 'hold') {
       console.log("[DEBUG] decision hold");
       return res.json({ message: 'No trade executed. Decision is Hold.' });
     }
 
     // Fetch last price
-    const baseUrl = getBinanceBaseUrl(exchangeType);
-    const priceEndpoint = exchangeType.includes('futures')
+    const baseUrl = getBinanceBaseUrl(exType);
+    const priceEndpoint = exType.includes('futures')
       ? `${baseUrl}/fapi/v1/ticker/price?symbol=${symbol}`
       : `${baseUrl}/api/v3/ticker/price?symbol=${symbol}`;
 
@@ -634,41 +593,43 @@ app.post('/api/execute-trade', async (req, res) => {
     const { price: lastPrice } = await lastPriceResp.json();
 
     // Fetch account info
-    const accountInfo = await getAccountInfoFromBinance(apiKey, apiSecretKey, exchangeType);
-    const availableUSDT = parseFloat(exchangeType.includes('futures') ? accountInfo.availableBalance : accountInfo.free);
-    if (!availableUSDT || availableUSDT <= 0) return res.status(400).json({ error: 'Insufficient funds', availableUSDT });
+    const accountInfo = await getAccountInfoFromBinance(apiKey, apiSecretKey, exType);
+    const availableUSDT = parseFloat(exType.includes('futures') ? accountInfo.availableBalance : accountInfo.free);
+    if (!availableUSDT || availableUSDT <= 0) {
+      return res.status(400).json({ error: 'Insufficient funds', availableUSDT });
+    }
 
-    if (!exchangeType.includes('futures')) {
+    if (!exType.includes('futures')) {
       return res.status(400).json({ error: 'Spot trading not implemented. Use a futures exchangeType.' });
     }
 
-    // ⚡ AUTO-FETCH STRONG SUPPORT/RESISTANCE if missing
-    if (!strongSupport || !strongResistance) {
-      console.log("[DEBUG] Missing support/resistance, fetching from market makers...");
-      const marketData = await getAdvancedMarketMakers(symbol, 1000, exchangeType);
-      strongSupport = marketData.strongSupport?.price ?? lastPrice;
-      strongResistance = marketData.strongResistance?.price ?? lastPrice;
-      console.log("[DEBUG] Auto-fetched strongSupport:", strongSupport, "strongResistance:", strongResistance);
-    }
+    console.log("[DEBUG] Calling executeTrade() engine with timeout safeguard...");
 
-    console.log("[DEBUG] Calling executeTrade() engine...");
-    const tradeResponse = await executeTrade(
-      apiKey,
-      apiSecretKey,
-      symbol,
-      tradeDecision,
-      parseFloat(lastPrice),
-      exchangeType,
-      availableUSDT,
-      userEmail,
-      strongSupport,
-      strongResistance,
-      3,
-      options ?? {}
-    );
+    // ⚡ Timeout wrapper
+    const executeWithTimeout = (timeoutMs) => {
+      return Promise.race([
+        executeTrade(
+          apiKey,
+          apiSecretKey,
+          symbol,
+          tradeDecision,
+          parseFloat(lastPrice),
+          exType,
+          availableUSDT,
+          
+          null, // strongSupport fetched internally
+          null, // strongResistance fetched internally
+          3,
+          options ?? {}
+        ),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('executeTrade timed out')), timeoutMs)
+        )
+      ]);
+    };
 
+    const tradeResponse = await executeWithTimeout(15000); // 15 seconds timeout
     console.log("[DEBUG] Trade Response:", tradeResponse);
-
     return res.json({ success: true, tradeResponse });
 
   } catch (err) {

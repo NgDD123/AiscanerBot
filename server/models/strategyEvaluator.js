@@ -249,7 +249,7 @@ async function evaluateStrategy(symbol, exchangeType = 'binancefutures') {
     const totalVol = buyVol + sellVol;
     const delta = totalVol === 0 ? 0 : ((buyVol - sellVol) / totalVol) * 100;
 
-    const frvpMulti = await calculateMultiTimeframeFRVP(symbol, ['1h','4h','1d']);
+    const frvpMulti = await calculateMultiTimeframeFRVP(symbol, ['1h', '4h', '1d']);
     const atr = ATR.calculate({ period: 14, high: data1h.map(c => c.high), low: data1h.map(c => c.low), close: data1h.map(c => c.close) }).at(-1) || 0;
     const tolerance1 = (atr / latest.close) * 100;
 
@@ -314,12 +314,12 @@ async function evaluateStrategy(symbol, exchangeType = 'binancefutures') {
         const frvp1h = frvpMulti['1h'];
         if (latest.close <= frvp1h.valueAreaLow * (1 + tolerance1) &&
             latest.close >= frvp1h.valueAreaLow * (1 - tolerance1)) {
-                buyScore++;
-                console.log("frvp1h: BUY (+1BUY SCORE) ");
+            buyScore++;
+            console.log("frvp1h: BUY (+1BUY SCORE) ");
         } else if (latest.close <= frvp1h.valueAreaHigh * (1 + tolerance1) &&
-                latest.close >= frvp1h.valueAreaHigh * (1 - tolerance1)) {
-                    sellScore++;
-                    console.log("frvp1h: SELL (+1SELL SCORE) ");
+            latest.close >= frvp1h.valueAreaHigh * (1 - tolerance1)) {
+            sellScore++;
+            console.log("frvp1h: SELL (+1SELL SCORE) ");
         }
 
         if (engulfing === 'bullishEngulfing') {
@@ -347,10 +347,10 @@ async function evaluateStrategy(symbol, exchangeType = 'binancefutures') {
         }
     }
 
-    if (buyScore >= 5) {
+    if (buyScore >= 4) {
         console.log('Final Decision: BUY');
         return { signal: 'BUY', price: latest.close, buyScore, sellScore };
-    } else if (sellScore >= 5) {
+    } else if (sellScore >= 4) {
         console.log('Final Decision: SELL');
         return { signal: 'SELL', price: latest.close, buyScore, sellScore };
     }
