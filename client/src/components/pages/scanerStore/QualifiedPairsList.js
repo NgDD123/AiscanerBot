@@ -21,7 +21,7 @@ export default function QualifiedPairsList() {
   const [loading, setLoading] = useState(true);
   const [highlightedIds, setHighlightedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const pairsPerPage = 8;
+  const pairsPerPage = 4;
 
   const exchangeType = useSelector((state) => state.user.exchangeType);
 
@@ -256,44 +256,54 @@ export default function QualifiedPairsList() {
       ) : currentPairs.length === 0 ? (
         <p className="text-center text-gray-400 italic">No pairs found</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(100vh-200px)]">
           {currentPairs.map((p) => (
             <div
               key={p.id}
-              className={`bg-gray-900 rounded-2xl shadow-2xl p-5 border-l-4 ${highlightedIds.includes(p.id) ? "border-green-400 animate-pulse" : "border-gray-700"} transform hover:scale-105 transition duration-300`}
+              className={`bg-gray-900 rounded-3xl shadow-2xl p-8 border-l-4 flex flex-col justify-between h-full w-full ${highlightedIds.includes(p.id)
+                  ? "border-green-400 animate-pulse"
+                  : "border-gray-700"
+                } transform hover:scale-105 transition duration-300`}
             >
-              <h3 className="text-xl font-bold mb-2">{p.pair}</h3>
-              <p
-                className={`font-semibold text-lg mb-1 ${p.signal.toLowerCase() === "buy" ? "text-green-400" : p.signal.toLowerCase() === "sell" ? "text-red-500" : "text-yellow-400"}`}
-              >
-                {p.signal}
-              </p>
-              <p className="mb-1">Score: {p.score}</p>
-              <p className="mb-1 text-gray-300">
-                BUY: {formatSupportResistance(p.strongSupport)}
-              </p>
-              <p className="mb-1 text-gray-300">
-                SELL: {formatSupportResistance(p.strongResistance)}
-              </p>
-              <p className="text-gray-500 text-sm mb-2">
-                {formatDate(p.createdAt)}
-              </p>
-              <div className="flex gap-2">
+              <div>
+                <h3 className="text-2xl font-extrabold mb-3">{p.pair}</h3>
+                <p
+                  className={`font-bold text-xl mb-2 ${p.signal.toLowerCase() === "buy"
+                      ? "text-green-400"
+                      : p.signal.toLowerCase() === "sell"
+                        ? "text-red-700"
+                        : "text-yellow-400"
+                    }`}
+                >
+                  {p.signal}
+                </p>
+                <p className="mb-2 text-lg">Score: {p.score}</p>
+                <p className="mb-1 text-gray-100">
+                  BUY: {formatSupportResistance(p.strongSupport)}
+                </p>
+                <p className="mb-1 text-gray-100">
+                  SELL: {formatSupportResistance(p.strongResistance)}
+                </p>
+                <p className="text-gray-500 text-sm mb-3">
+                  {formatDate(p.createdAt)}
+                </p>
+              </div>
+              <div className="flex gap-2 mt-4">
                 <button
                   onClick={() => exportPDF(p)}
-                  className="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded text-sm font-bold"
+                  className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded text-sm font-bold flex-1"
                 >
                   PDF
                 </button>
                 <button
                   onClick={() => exportExcel(p)}
-                  className="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded text-sm font-bold"
+                  className="bg-yellow-500 hover:bg-yellow-600 px-4 py-2 rounded text-sm font-bold flex-1"
                 >
                   Excel
                 </button>
                 <button
                   onClick={() => deletePair(p.id)}
-                  className="bg-red-700 hover:bg-red-800 px-3 py-1 rounded text-sm font-bold"
+                  className="bg-red-700 hover:bg-red-800 px-4 py-2 rounded text-sm font-bold flex-1"
                 >
                   ❌
                 </button>
@@ -301,6 +311,7 @@ export default function QualifiedPairsList() {
             </div>
           ))}
         </div>
+
       )}
 
       <div className="flex justify-between items-center mt-6">
