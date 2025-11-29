@@ -36,16 +36,19 @@ router.get('/', async (req, res) => {
             }
           : null,
 
-        // 🔥🔥🔥 IMPORTANT — ADD EVERYTHING BELOW 🔥🔥🔥
+        // MARKET DATA & STRATEGY
         ltp: bestPair.ltp,
-        pipDistance: bestPair.pipDistance,
-        profitPercent: bestPair.profitPercent,
-        stopLoss: bestPair.stopLoss,
-        stopLossPips: bestPair.stopLossPips,
-        riskRewardRatio: bestPair.riskRewardRatio,
-        suggestedLeverage: bestPair.suggestedLeverage,
-        largeBidWalls: bestPair.largeBidWalls,
-        largeAskWalls: bestPair.largeAskWalls
+        pipDistance: bestPair.pipDistance !== null ? Number(bestPair.pipDistance.toFixed(8)) : null,
+        profitPercent: bestPair.profitPercent !== undefined ? bestPair.profitPercent : null,
+        stopLoss: bestPair.stopLoss !== undefined ? bestPair.stopLoss : null,
+        stopLossPrice: bestPair.stopLossPrice !== undefined ? bestPair.stopLossPrice : null,
+        takeProfitPrice: bestPair.takeProfitPrice !== undefined ? bestPair.takeProfitPrice : null,
+        riskRewardRatio: bestPair.riskRewardRatio !== undefined ? bestPair.riskRewardRatio : null,
+        suggestedLeverage: bestPair.suggestedLeverage !== undefined ? bestPair.suggestedLeverage : null,
+
+        // LIQUIDITY WALLS
+        largeBidWalls: Array.isArray(bestPair.largeBidWalls) ? bestPair.largeBidWalls : [],
+        largeAskWalls: Array.isArray(bestPair.largeAskWalls) ? bestPair.largeAskWalls : []
       });
     } else {
       res.status(200).json({
@@ -58,4 +61,5 @@ router.get('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to determine best trading pair' });
   }
 });
+
 module.exports = router;

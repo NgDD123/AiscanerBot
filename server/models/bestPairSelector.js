@@ -5,10 +5,8 @@ const { getAdvancedMarketMakers } = require('./marketMakers'); // your market ma
 
 // Global cache to prevent repeated picks
 const qualifiedCache = {}; // { pair: timestamp }
-
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// ---------------- Helper functions ----------------
 function isRecentlyQualified(pair) {
   const now = Date.now();
   const ONE_HOUR = 60 * 60 * 1000;
@@ -23,7 +21,6 @@ function markAsQualified(pair) {
 const GREEN = '\x1b[32m';
 const RESET = '\x1b[0m';
 
-// ---------------- Main function ----------------
 async function findBestTradingPair(exchangeType = 'binancefutures') {
   try {
     const { topVolatilePairs, topGainerPairs, topVolumePairs } =
@@ -49,12 +46,11 @@ async function findBestTradingPair(exchangeType = 'binancefutures') {
         const strategyResult = await evaluateStrategy(pair);
         const marketData = await getAdvancedMarketMakers(pair, 1000, exchangeType, 3, 500);
 
-        // ---------------- Safe numeric defaults ----------------
         const safeNumber = (value, fallback = 0) =>
           value != null && !isNaN(Number(value)) ? Number(value) : fallback;
 
-        const strongSupport = marketData.strongSupport || { price: 0, qty: 0 };
-        const strongResistance = marketData.strongResistance || { price: 0, qty: 0 };
+        const strongSupport = marketData.strongSupport || { price: 'N/A', qty: 'N/A' };
+        const strongResistance = marketData.strongResistance || { price: 'N/A', qty: 'N/A' };
 
         const bestPick = {
           pair,
@@ -63,14 +59,18 @@ async function findBestTradingPair(exchangeType = 'binancefutures') {
           strongSupport,
           strongResistance,
           ltp: safeNumber(marketData.ltp),
-          pipDistance: safeNumber(marketData.pipDistance),
-          profitPercent: safeNumber(marketData.profitPercent),
-          stopLoss: safeNumber(marketData.stopLoss),
-          stopLossPips: safeNumber(marketData.stopLossPips),
+          pipDistance: marketData.strongSupport && marketData.strongResistance && marketData.ltp
+            ? Math.abs(strongResistance.price - strongSupport.price)
+            : null,
+          profitPercent: safeNumber(marketData.takeProfitPercent),
+          stopLoss: safeNumber(marketData.stopLossPercent),
+          stopLossPrice: safeNumber(marketData.stopLossPrice),
+          takeProfitPrice: safeNumber(marketData.takeProfitPrice),
+          stopLossPips: null,
           riskRewardRatio: safeNumber(marketData.riskRewardRatio, 1),
           suggestedLeverage: safeNumber(marketData.suggestedLeverage, 1),
-          largeBidWalls: Array.isArray(marketData.persistentLargeBidWalls) ? marketData.persistentLargeBidWalls : [],
-          largeAskWalls: Array.isArray(marketData.persistentLargeAskWalls) ? marketData.persistentLargeAskWalls : [],
+          largeBidWalls: Array.isArray(marketData.largeBidWalls) ? marketData.largeBidWalls : [],
+          largeAskWalls: Array.isArray(marketData.largeAskWalls) ? marketData.largeAskWalls : [],
         };
 
         const qualifies = bestPick.score >= 7;
@@ -86,12 +86,12 @@ Score: ${bestPick.score}
 🟢 Strong Support: ${bestPick.strongSupport.price} (Qty=${bestPick.strongSupport.qty})
 🔴 Strong Resistance: ${bestPick.strongResistance.price} (Qty=${bestPick.strongResistance.qty})
 LTP: ${bestPick.ltp}
-Pip Distance: ${bestPick.pipDistance}
-Profit %: ${bestPick.profitPercent}
-Stop Loss: ${bestPick.stopLoss}
-SL Pips: ${bestPick.stopLossPips}
-R/R Ratio: ${bestPick.riskRewardRatio}
-Leverage: ${bestPick.suggestedLeverage}${RESET}`);
+Pip Distance: ${bestPick.pipDistance !== null ? bestPick.pipDistance.toFixed(8) : 'N/A'}
+💰 Take Profit: ${bestPick.profitPercent}% (Price: ${bestPick.takeProfitPrice})
+🛡 Stop-Loss: ${bestPick.stopLoss}% (Price: ${bestPick.stopLossPrice})
+SL Pips: ${bestPick.stopLossPips !== null ? bestPick.stopLossPips : 'N/A'}
+⚖️ Risk-Reward Ratio: ${bestPick.riskRewardRatio}
+🚀 Suggested Leverage: ${bestPick.suggestedLeverage}x${RESET}`);
 
           return bestPick; // return first qualified pair
         } else {
