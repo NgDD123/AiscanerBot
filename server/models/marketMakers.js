@@ -1,6 +1,18 @@
 const fetch = require('node-fetch');
 const { getBinanceBaseUrl } = require('../Routes/binanceConfig');
 
+// ---------------- Helper: get dynamic tick size ----------------
+async function getTickSize(symbol, exchangeType) {
+    const baseUrl = getBinanceBaseUrl(exchangeType);
+    const res = await fetch(`${baseUrl}/fapi/v1/exchangeInfo`);
+    const data = await res.json();
+    const info = data.symbols.find(s => s.symbol === symbol);
+    if (!info) throw new Error(`Symbol ${symbol} not found in exchange info`);
+    const tickSize = parseFloat(info.filters.find(f => f.filterType === "PRICE_FILTER").tickSize);
+    return tickSize;
+}
+
+// ---------------- Main function ----------------
 async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'binancefutures', snapshots = 3, intervalMs = 5000) {
     const baseUrl = getBinanceBaseUrl(exchangeType);
     const endpoint = `${baseUrl}/fapi/v1/depth?symbol=${symbol}&limit=${limit}`;
@@ -8,7 +20,6 @@ async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'bin
 
     const allSnapshots = [];
 
-    // Take multiple snapshots
     for (let i = 0; i < snapshots; i++) {
         const res = await fetch(endpoint);
         const data = await res.json();
@@ -21,21 +32,19 @@ async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'bin
         if (i < snapshots - 1) await new Promise(r => setTimeout(r, intervalMs));
     }
 
-    // Get LTP
     const priceRes = await fetch(priceEndpoint);
     const priceData = await priceRes.json();
     const ltp = parseFloat(priceData.price);
 
-    // Dynamic threshold
+    // Dynamic threshold for large walls
     const avgBidSize = allSnapshots.flatMap(s => s.bids).reduce((sum, o) => sum + o.qty, 0) /
-                       (allSnapshots.flatMap(s => s.bids).length || 1);
+        (allSnapshots.flatMap(s => s.bids).length || 1);
     const avgAskSize = allSnapshots.flatMap(s => s.asks).reduce((sum, o) => sum + o.qty, 0) /
-                       (allSnapshots.flatMap(s => s.asks).length || 1);
+        (allSnapshots.flatMap(s => s.asks).length || 1);
 
     const wallThresholdBid = avgBidSize * 10;
     const wallThresholdAsk = avgAskSize * 10;
 
-    // Find persistent walls
     const persistentLargeBidWalls = [];
     const persistentLargeAskWalls = [];
 
@@ -51,7 +60,6 @@ async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'bin
         if (count === snapshots) persistentLargeAskWalls.push(ask);
     });
 
-    // Cumulative volume
     const getCumulativeVolume = (walls, range = 0.001) => {
         return walls.map(wall => {
             const nearbyQty = walls
@@ -68,23 +76,17 @@ async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'bin
     let strongResistance = null;
 
     if (cumBidWalls.length > 0) {
-        strongSupport = cumBidWalls.reduce((max, w) =>
-            w.cumulativeQty > max.cumulativeQty ? w : max
-        );
+        strongSupport = cumBidWalls.reduce((max, w) => w.cumulativeQty > max.cumulativeQty ? w : max);
     }
 
     if (cumAskWalls.length > 0) {
-        strongResistance = cumAskWalls.reduce((max, w) =>
-            w.cumulativeQty > max.cumulativeQty ? w : max
-        );
+        strongResistance = cumAskWalls.reduce((max, w) => w.cumulativeQty > max.cumulativeQty ? w : max);
     }
 
-    if (strongSupport) console.log(`🟢 STRONG Support @ ${strongSupport.price} (CumQty=${strongSupport.cumulativeQty})`);
-    if (strongResistance) console.log(`🔴 STRONG Resistance @ ${strongResistance.price} (CumQty=${strongResistance.cumulativeQty})`);
+    if (strongSupport) console.log("\x1b[33m%s\x1b[0m", `🟢 STRONG Support @ ${strongSupport.price} (CumQty=${strongSupport.cumulativeQty})`);
+    if (strongResistance) console.log("\x1b[33m%s\x1b[0m", `🔴 STRONG Resistance @ ${strongResistance.price} (CumQty=${strongResistance.cumulativeQty})`);
 
-    // -------------------------
-    // PIP & Profit Calculation
-    // -------------------------
+    // ------------------------- Dynamic Pip & Profit Calculation -------------------------
     let pipDistance = null;
     let profitPercent = null;
     let stopLoss = null;
@@ -93,28 +95,26 @@ async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'bin
     let suggestedLeverage = null;
 
     if (strongSupport && strongResistance) {
+        const tickSize = await getTickSize(symbol, exchangeType);
         const diff = Math.abs(strongResistance.price - strongSupport.price);
-        pipDistance = diff / 0.0001; // 1 pip = 0.0001
+
+        pipDistance = diff / tickSize;
         profitPercent = (diff / strongSupport.price) * 100;
 
-        // Stop-Loss example: 1/3 of distance below support
         stopLoss = strongSupport.price - diff / 3;
-        stopLossPips = (strongSupport.price - stopLoss) / 0.0001;
+        stopLossPips = (strongSupport.price - stopLoss) / tickSize;
 
-        // Risk-Reward Ratio
         riskRewardRatio = (strongResistance.price - strongSupport.price) / (strongSupport.price - stopLoss);
-
-        // Suggested leverage (simplified):
-        // Assume max 2% risk per trade, leverage = RRR * (1 / 0.02)
         suggestedLeverage = riskRewardRatio / 0.02;
 
-        console.log(`📏 Pip Distance: ${pipDistance.toFixed(2)} pips`);
-        console.log(`💰 Potential Profit: ${profitPercent.toFixed(2)}%`);
-        console.log(`🛡 Stop-Loss: ${stopLoss.toFixed(5)} (${stopLossPips.toFixed(2)} pips)`);
-        console.log(`⚖️ Risk-Reward Ratio: ${riskRewardRatio.toFixed(2)}`);
-        console.log(`🚀 Suggested Leverage: ${suggestedLeverage.toFixed(2)}x`);
+        console.log("\x1b[33m%s\x1b[0m", `📏 Pip Distance: ${pipDistance.toFixed(2)} pips`);
+        console.log("\x1b[33m%s\x1b[0m", `💰 Potential Profit: ${profitPercent.toFixed(2)}%`);
+        console.log("\x1b[33m%s\x1b[0m", `🛡 Stop-Loss: ${stopLoss.toFixed(5)} (${stopLossPips.toFixed(2)} pips)`);
+        console.log("\x1b[33m%s\x1b[0m", `⚖️ Risk-Reward Ratio: ${riskRewardRatio.toFixed(2)}`);
+        console.log("\x1b[33m%s\x1b[0m", `🚀 Suggested Leverage: ${suggestedLeverage.toFixed(2)}x`);
     }
 
+    // ✅ Correct null/undefined check
     return {
         bids: lastSnapshot.bids,
         asks: lastSnapshot.asks,
@@ -122,12 +122,12 @@ async function getAdvancedMarketMakers(symbol, limit = 1000, exchangeType = 'bin
         strongResistance,
         ltp,
 
-        pipDistance: pipDistance ? Number(pipDistance.toFixed(2)) : null,
-        profitPercent: profitPercent ? Number(profitPercent.toFixed(2)) : null,
-        stopLoss: stopLoss ? Number(stopLoss.toFixed(5)) : null,
-        stopLossPips: stopLossPips ? Number(stopLossPips.toFixed(2)) : null,
-        riskRewardRatio: riskRewardRatio ? Number(riskRewardRatio.toFixed(2)) : null,
-        suggestedLeverage: suggestedLeverage ? Number(suggestedLeverage.toFixed(2)) : null,
+        pipDistance: pipDistance !== undefined && pipDistance !== null ? Number(pipDistance.toFixed(2)) : null,
+        profitPercent: profitPercent !== undefined && profitPercent !== null ? Number(profitPercent.toFixed(2)) : null,
+        stopLoss: stopLoss !== undefined && stopLoss !== null ? Number(stopLoss.toFixed(5)) : null,
+        stopLossPips: stopLossPips !== undefined && stopLossPips !== null ? Number(stopLossPips.toFixed(2)) : null,
+        riskRewardRatio: riskRewardRatio !== undefined && riskRewardRatio !== null ? Number(riskRewardRatio.toFixed(2)) : null,
+        suggestedLeverage: suggestedLeverage !== undefined && suggestedLeverage !== null ? Number(suggestedLeverage.toFixed(2)) : null,
 
         largeBidWalls: persistentLargeBidWalls,
         largeAskWalls: persistentLargeAskWalls

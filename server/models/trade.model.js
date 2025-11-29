@@ -51,7 +51,7 @@ async function executeTrade(
     trailingCallbackRatePct: 1.5,
     klinesIntervalForAtr: '5m',
     klinesLimitForAtr: 14,
-    useMarketOnBreakout: true,
+    useMarketOnBreakout: false,
     log: null
   };
   const cfg = { ...defaultCfg, ...options };
@@ -158,34 +158,27 @@ async function executeTrade(
     const tickSize = parseFloat(priceFilter.tickSize ?? '0.00001');
     const minNotional = parseFloat(symbolInfo.filters.find(f => f.filterType === 'MIN_NOTIONAL')?.notional || symbolInfo.filters.find(f => f.filterType === 'MIN_NOTIONAL')?.minNotional || '10');
 
-    log('precision & filters', { qtyPrecision, pricePrecision, stepSize, tickSize, minQty, maxQty, minNotional });
+    log('precision & filters', { qtyPrecision, pricePrecision, stepSize, tickSize, minNotional });
 
     // helpers to fix price & qty to tick/step rules
     const fixPrice = (p) => {
       if (!isFinite(p)) return p;
-      // Round to nearest tick to avoid "Price not increased by tick size"
       const rounded = Math.round(p / tickSize) * tickSize;
       return parseFloat(rounded.toFixed(pricePrecision));
     };
 
     const fixQty = (q) => {
       if (!isFinite(q)) return q;
-      // floor to stepSize and respect qtyPrecision
       const floored = Math.floor(q / stepSize) * stepSize;
-      // avoid negative or zero qty
       const safe = floored <= 0 ? stepSize : floored;
-      // cap to maxQty
       const capped = Math.min(safe, maxQty);
-      // ensure at least minQty
       const finalQty = capped < minQty ? minQty : capped;
       return parseFloat(finalQty.toFixed(qtyPrecision));
     };
 
     const clampCallbackRate = (r) => {
-      // Binance requires 0.1 <= callbackRate <= 5
       if (!isFinite(r)) r = cfg.trailingCallbackRatePct;
       const clamped = Math.max(0.1, Math.min(r, 5));
-      // round to 1 decimal to be safe (Binance accepts up to 1 decimal in many cases)
       return parseFloat(clamped.toFixed(1));
     };
 
@@ -197,15 +190,13 @@ async function executeTrade(
       strongResistance = strongResistance ?? (mm.strongResistance?.price ?? mm.strongResistance ?? lastPrice);
     }
 
-    // IMPORTANT: compute entry price using pricePrecision and tickSize
-    let entryPrice = parseFloat((action === 'BUY' ? strongSupport : strongResistance));
+    // compute entry price using pricePrecision and tickSize
+    let entryPrice = parseFloat(action === 'BUY' ? strongSupport : strongResistance);
     entryPrice = fixPrice(entryPrice);
 
     // compute raw quantity
     let quantity = ((availableUSDT * 0.98) / entryPrice);
-    // ensure minNotional
     if (entryPrice * quantity < minNotional) quantity = Math.ceil(minNotional / entryPrice);
-    // fix to step/tick/precision and cap
     quantity = fixQty(quantity);
 
     if (quantity <= 0) throw new Error('Invalid order quantity computed');
@@ -223,17 +214,17 @@ async function executeTrade(
       log('leverage set', d);
     });
 
-    // Create entry params but do NOT set timeInForce for MARKET orders
-    const orderType = exchangeType.toLowerCase().includes('testnet') ? 'MARKET' : 'LIMIT';
-    const entryParams = { symbol, side: action, type: orderType, quantity };
+    // ✅ FORCE LIMIT ENTRY ORDER ONLY
+    const entryParams = {
+      symbol,
+      side: action,
+      type: 'LIMIT',
+      quantity,
+      price: entryPrice,
+      timeInForce: 'GTC'
+    };
 
-    if (orderType === 'LIMIT') {
-      entryParams.price = entryPrice;
-      entryParams.timeInForce = 'GTC';
-    }
-    // For MARKET orders: do not include price or timeInForce
     const entryOrder = await safePlaceOrder(entryParams);
-
     const executedQty = +entryOrder.executedQty;
     const avgPrice = +entryOrder.avgPrice || entryPrice;
 
@@ -254,23 +245,18 @@ async function executeTrade(
         trailingCallbackRate = cfg.trailingCallbackRatePct;
       }
 
-      // fix prices to tickSize & precision
       stopPrice = fixPrice(stopPrice);
       tpPrice = fixPrice(tpPrice);
 
-      // Trailing activation gap based on average price, then fixed to tick size
       const activationGapPct = 0.01;
       const trailActivation = action === 'BUY'
         ? fixPrice(avgPriceLocal * (1 + activationGapPct))
         : fixPrice(avgPriceLocal * (1 - activationGapPct));
 
-      // fix qty according to stepSize / maxQty
       const qty = fixQty(executedQtyLocal);
+      const callbackRate = clampCallbackRate(trailingCallbackRate);
 
-      // ensure callbackRate within Binance allowed range
-      let callbackRate = clampCallbackRate(trailingCallbackRate);
-
-      // TAKE-PROFIT LIMIT order (LIMIT SELL/BUY)
+      // TAKE-PROFIT LIMIT order
       const tpOrderParams = {
         symbol,
         side: action === 'BUY' ? 'SELL' : 'BUY',
@@ -281,10 +267,9 @@ async function executeTrade(
         reduceOnly: true,
         workingType: 'MARK_PRICE'
       };
-
       const tpOrder = await safePlaceOrder(tpOrderParams);
 
-      // STOP_MARKET order (no timeInForce)
+      // STOP_MARKET order
       const stopOrderParams = {
         symbol,
         side: action === 'BUY' ? 'SELL' : 'BUY',
@@ -294,7 +279,6 @@ async function executeTrade(
         stopPrice: stopPrice,
         workingType: 'MARK_PRICE'
       };
-
       const stopOrder = await safePlaceOrder(stopOrderParams);
 
       // TRAILING STOP MARKET
@@ -308,7 +292,6 @@ async function executeTrade(
         activationPrice: trailActivation,
         workingType: 'MARK_PRICE'
       };
-
       const trailOrder = await safePlaceOrder(trailOrderParams);
 
       log('placed protections', { tpOrderId: tpOrder.orderId, stopOrderId: stopOrder.orderId, trailOrderId: trailOrder.orderId });

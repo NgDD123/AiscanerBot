@@ -4,9 +4,9 @@ import { db } from "../../../firebase";
 import {
   collection,
   onSnapshot,
-  addDoc,
-  deleteDoc,
   doc,
+  setDoc,
+  deleteDoc,
   orderBy,
   query,
   serverTimestamp,
@@ -25,75 +25,114 @@ export default function QualifiedPairsList() {
 
   const exchangeType = useSelector((state) => state.user.exchangeType);
 
-  // Firestore real-time fetch
+  // ---------------- Firestore subscription ----------------
   useEffect(() => {
+    console.log("Setting up Firestore snapshot...");
     const q = query(
       collection(db, "qualifiedPairs"),
-      orderBy("createdAt", "desc"),
+      orderBy("createdAt", "desc")
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setPairs(data);
-      setLoading(false);
-    });
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        console.log("Snapshot received:", data);
+        setPairs(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Firestore snapshot error:", error);
+        setLoading(false);
+      }
+    );
+
     return () => unsubscribe();
   }, []);
 
-  // Fetch best scoring pair from backend
+  // ---------------- Fetch best scoring pair from backend ----------------
   const fetchBestScoringPair = async () => {
     try {
       const response = await fetch("http://localhost:8001/api/best-pair", {
         headers: { "X-EXCHANGE-TYPE": exchangeType || "binanceFutures" },
       });
+
       if (!response.ok)
-        throw new Error(
-          `Failed to fetch best pair. Status: ${response.status}`,
-        );
+        throw new Error(`Failed to fetch best pair. Status: ${response.status}`);
+
       const data = await response.json();
+      console.log("Fetched best pair:", data);
 
-      if (data.pair) {
-        const exists = pairs.some((p) => p.pair === data.pair);
-        if (!exists) {
-          const docRef = await addDoc(collection(db, "qualifiedPairs"), {
-            pair: data.pair,
-            signal: data.signal,
-            score: data.score,
-            strongSupport: data.strongSupport || null,
-            strongResistance: data.strongResistance || null,
-            createdAt: serverTimestamp(),
-          });
+      if (!data.pair) return;
 
-          setHighlightedIds((prev) => [...prev, docRef.id]);
-          setTimeout(() => {
-            setHighlightedIds((prev) => prev.filter((id) => id !== docRef.id));
-          }, 5000);
-        }
-      }
+      // 🔹 Upsert: use pair as doc ID and merge
+      const pairDocRef = doc(db, "qualifiedPairs", data.pair);
+
+      await setDoc(
+        pairDocRef,
+        {
+          pair: data.pair,
+          signal: data.signal,
+          score: data.score,
+          strongSupport: data.strongSupport ?? null,
+          strongResistance: data.strongResistance ?? null,
+          ltp: data.ltp != null ? Number(data.ltp) : null,
+          pipDistance: data.pipDistance != null ? Number(data.pipDistance) : null,
+          profitPercent: data.profitPercent != null ? Number(data.profitPercent) : null,
+          stopLoss: data.stopLoss != null ? Number(data.stopLoss) : null,
+          stopLossPips: data.stopLossPips != null ? Number(data.stopLossPips) : null,
+          riskRewardRatio: data.riskRewardRatio != null ? Number(data.riskRewardRatio) : null,
+          suggestedLeverage: data.suggestedLeverage != null ? Number(data.suggestedLeverage) : null,
+          largeBidWalls: data.largeBidWalls || [],
+          largeAskWalls: data.largeAskWalls || [],
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      setHighlightedIds((prev) => [...prev, data.pair]);
+      setTimeout(() => {
+        setHighlightedIds((prev) => prev.filter((id) => id !== data.pair));
+      }, 5000);
     } catch (err) {
       console.error("❌ Error fetching best scoring pair:", err);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchBestScoringPair();
-    const interval = setInterval(fetchBestScoringPair, 60000);
+    const interval = setInterval(fetchBestScoringPair, 10000);
     return () => clearInterval(interval);
   }, [exchangeType]);
 
+  // ---------------- Delete a pair ----------------
   const deletePair = async (id) => {
     try {
       await deleteDoc(doc(db, "qualifiedPairs", id));
+      console.log("Deleted pair:", id);
     } catch (err) {
       console.error("❌ Error deleting pair:", err);
     }
   };
 
+  // ---------------- Format helpers ----------------
   const formatDate = (ts) =>
     ts ? new Date(ts.seconds * 1000).toLocaleString() : "N/A";
-  const formatSupportResistance = (sr) =>
-    sr ? `Price: ${sr.price} | Qty: ${sr.qty}` : "N/A";
 
-  // Pagination
+  const formatSupportResistance = (sr) =>
+    sr ? `Price: ${sr.price} ` : "N/A";
+
+  const formatArray = (arr) =>
+    arr && arr.length > 0 ? arr.map((a) => `${a.price}@${a.qty}`).join(", ") : "N/A";
+
+  const profitColor = (value) =>
+    value == null ? "text-yellow-400" : value > 0 ? "text-green-400" : "text-red-600";
+
+  const rrColor = (value) =>
+    value == null ? "text-yellow-400" : value >= 1 ? "text-green-400" : "text-red-600";
+
+  // ---------------- Pagination ----------------
   const indexOfLastPair = currentPage * pairsPerPage;
   const indexOfFirstPair = indexOfLastPair - pairsPerPage;
   const currentPairs = pairs.slice(indexOfFirstPair, indexOfLastPair);
@@ -102,139 +141,22 @@ export default function QualifiedPairsList() {
     currentPage < totalPages && setCurrentPage(currentPage + 1);
   const goToPrevPage = () => currentPage > 1 && setCurrentPage(currentPage - 1);
 
-  // PDF/Excel exports
-  const exportPDF = (pair) => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("Qualified Pair Report", 14, 20);
-    doc.setFontSize(12);
-    doc.text("Brand: GB & MA", 14, 28);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
-
-    doc.autoTable({
-      head: [["Pair", "Signal", "Score", "Support", "Resistance", "Time"]],
-      body: [
-        [
-          pair.pair,
-          pair.signal,
-          pair.score,
-          formatSupportResistance(pair.strongSupport),
-          formatSupportResistance(pair.strongResistance),
-          formatDate(pair.createdAt),
-        ],
-      ],
-      startY: 50,
-      styles: { fontSize: 11 },
-      headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255] },
-      alternateRowStyles: {
-        fillColor: [50, 50, 50],
-        textColor: [255, 255, 255],
-      },
-    });
-
-    doc.save(`${pair.pair}_report.pdf`);
-  };
-
-  const exportExcel = (pair) => {
-    const ws = XLSX.utils.json_to_sheet([
-      {
-        Pair: pair.pair,
-        Signal: pair.signal,
-        Score: pair.score,
-        Support: formatSupportResistance(pair.strongSupport),
-        Resistance: formatSupportResistance(pair.strongResistance),
-        Time: formatDate(pair.createdAt),
-      },
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Pair Report");
-    ws["!cols"] = [
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 8 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 25 },
-    ];
-    XLSX.writeFile(wb, `${pair.pair}_report.xlsx`);
-  };
-
-  const exportAllPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("Qualified Pairs Report", 14, 20);
-    doc.setFontSize(12);
-    doc.text("Brand: GB & MA", 14, 28);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
-
-    const chunkSize = 8;
-    for (let i = 0; i < pairs.length; i += chunkSize) {
-      if (i > 0) doc.addPage();
-      const chunk = pairs.slice(i, i + chunkSize);
-      doc.autoTable({
-        head: [["Pair", "Signal", "Score", "Support", "Resistance", "Time"]],
-        body: chunk.map((p) => [
-          p.pair,
-          p.signal,
-          p.score,
-          formatSupportResistance(p.strongSupport),
-          formatSupportResistance(p.strongResistance),
-          formatDate(p.createdAt),
-        ]),
-        startY: 50,
-        styles: { fontSize: 11, textColor: [255, 255, 255] },
-        headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255] },
-        alternateRowStyles: {
-          fillColor: [50, 50, 50],
-          textColor: [255, 255, 255],
-        },
-      });
-    }
-    doc.save("qualified_pairs_report.pdf");
-  };
-
-  const exportAllExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(
-      pairs.map((p) => ({
-        Pair: p.pair,
-        Signal: p.signal,
-        Score: p.score,
-        Support: formatSupportResistance(p.strongSupport),
-        Resistance: formatSupportResistance(p.strongResistance),
-        Time: formatDate(p.createdAt),
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "All Pairs");
-    ws["!cols"] = [
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 8 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 25 },
-    ];
-    XLSX.writeFile(wb, "qualified_pairs_report.xlsx");
-  };
-
   return (
     <div className="p-6 bg-gradient-to-r from-gray-900 via-black to-gray-800 min-h-screen rounded-xl shadow-2xl text-white">
       <h2 className="text-3xl md:text-4xl font-extrabold mb-6 flex items-center gap-3">
         🔥 Qualified Pairs{" "}
-        <span className="text-green-400 text-lg md:text-xl">
-          ({exchangeType})
-        </span>
+        <span className="text-green-400 text-lg md:text-xl">({exchangeType})</span>
       </h2>
 
       <div className="flex flex-wrap gap-4 mb-6">
         <button
-          onClick={exportAllPDF}
+          onClick={() => currentPairs.length && exportPDF(currentPairs[0])}
           className="bg-red-600 hover:bg-red-700 px-5 py-3 rounded-lg shadow-lg font-bold transform hover:scale-105 transition"
         >
           ⬇ Export All PDF
         </button>
         <button
-          onClick={exportAllExcel}
+          onClick={() => currentPairs.length && exportExcel(currentPairs[0])}
           className="bg-green-600 hover:bg-green-700 px-5 py-3 rounded-lg shadow-lg font-bold transform hover:scale-105 transition"
         >
           ⬇ Export All Excel
@@ -260,34 +182,62 @@ export default function QualifiedPairsList() {
           {currentPairs.map((p) => (
             <div
               key={p.id}
-              className={`bg-gray-900 rounded-3xl shadow-2xl p-8 border-l-4 flex flex-col justify-between h-full w-full ${highlightedIds.includes(p.id)
+              className={`bg-gray-900 rounded-3xl shadow-2xl p-8 border-l-4 flex flex-col justify-between h-full w-full ${
+                highlightedIds.includes(p.id)
                   ? "border-green-400 animate-pulse"
                   : "border-gray-700"
-                } transform hover:scale-105 transition duration-300`}
+              } transform hover:scale-105 transition duration-300`}
             >
-              <div>
-                <h3 className="text-2xl font-extrabold mb-3">{p.pair}</h3>
-                <p
-                  className={`font-bold text-xl mb-2 ${p.signal.toLowerCase() === "buy"
-                      ? "text-green-400"
-                      : p.signal.toLowerCase() === "sell"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left Column */}
+                <div>
+                  <h3 className="text-2xl font-extrabold mb-3">{p.pair}</h3>
+                  <p
+                    className={`font-bold text-xl mb-2 ${
+                      p.signal?.toLowerCase() === "buy"
+                        ? "text-green-400"
+                        : p.signal?.toLowerCase() === "sell"
                         ? "text-red-700"
                         : "text-yellow-400"
                     }`}
-                >
-                  {p.signal}
-                </p>
-                <p className="mb-2 text-lg">Score: {p.score}</p>
-                <p className="mb-1 text-gray-100">
-                  BUY: {formatSupportResistance(p.strongSupport)}
-                </p>
-                <p className="mb-1 text-gray-100">
-                  SELL: {formatSupportResistance(p.strongResistance)}
-                </p>
-                <p className="text-gray-500 text-sm mb-3">
-                  {formatDate(p.createdAt)}
-                </p>
+                  >
+                    {p.signal ?? "N/A"}
+                  </p>
+                  <p className="mb-2 text-lg">Score: {p.score ?? "N/A"}</p>
+                  <p className="mb-1 text-gray-100">
+                    BUY: {formatSupportResistance(p.strongSupport)}
+                  </p>
+                  <p className="mb-1 text-gray-100">
+                    SELL: {formatSupportResistance(p.strongResistance)}
+                  </p>
+                  <p className="text-gray-500 text-sm mb-3">{formatDate(p.createdAt)}</p>
+                </div>
+
+                {/* Right Column */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                  <p className="font-semibold text-gray-300">LTP:</p>
+                  <p>{p.ltp != null ? p.ltp : "N/A"}</p>
+
+                  <p className="font-semibold text-gray-300">Pip Distance:</p>
+                  <p>{p.pipDistance != null ? p.pipDistance : "N/A"}</p>
+
+                  <p className="font-semibold text-gray-300">Take Profit %:</p>
+                  <p className={profitColor(p.profitPercent)}>{p.profitPercent != null ? p.profitPercent : "N/A"}</p>
+
+                  <p className="font-semibold text-gray-300">Stop Loss:</p>
+                  <p>{p.stopLoss != null ? p.stopLoss : "N/A"}</p>
+
+                  <p className="font-semibold text-gray-300">SL Pips:</p>
+                  <p>{p.stopLossPips != null ? p.stopLossPips : "N/A"}</p>
+
+                  <p className="font-semibold text-gray-300">R/R Ratio:</p>
+                  <p className={rrColor(p.riskRewardRatio)}>{p.riskRewardRatio != null ? p.riskRewardRatio : "N/A"}</p>
+
+                  <p className="font-semibold text-gray-300">Leverage:</p>
+                  <p>{p.suggestedLeverage != null ? p.suggestedLeverage : "N/A"}</p>
+                </div>
               </div>
+
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={() => exportPDF(p)}
@@ -311,7 +261,6 @@ export default function QualifiedPairsList() {
             </div>
           ))}
         </div>
-
       )}
 
       <div className="flex justify-between items-center mt-6">

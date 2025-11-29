@@ -1,87 +1,115 @@
+// bestPairFinder.js
 const { fetchAutomaticTradingPairs } = require('./topPairsFetcher');
 const { evaluateStrategy } = require('./strategyEvaluator');
-const { getAdvancedMarketMakers } = require('./marketMakers'); // import your file
+const { getAdvancedMarketMakers } = require('./marketMakers'); // your market makers file
 
-// Global cache to store recently qualified pairs
-const qualifiedCache = {}; // { 'BTCUSDT': timestamp }
+// Global cache to prevent repeated picks
+const qualifiedCache = {}; // { pair: timestamp }
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Helper: check if a pair qualified in the last hour
+// ---------------- Helper functions ----------------
 function isRecentlyQualified(pair) {
   const now = Date.now();
   const ONE_HOUR = 60 * 60 * 1000;
   return qualifiedCache[pair] && (now - qualifiedCache[pair] < ONE_HOUR);
 }
 
-// Helper: store the pair as qualified now
 function markAsQualified(pair) {
   qualifiedCache[pair] = Date.now();
 }
 
-// Main selector function
+// ANSI Green for logs
+const GREEN = '\x1b[32m';
+const RESET = '\x1b[0m';
+
+// ---------------- Main function ----------------
 async function findBestTradingPair(exchangeType = 'binancefutures') {
-  const { topVolatilePairs, topGainerPairs, topVolumePairs } = await fetchAutomaticTradingPairs(exchangeType);
+  try {
+    const { topVolatilePairs, topGainerPairs, topVolumePairs } =
+      await fetchAutomaticTradingPairs(exchangeType);
 
-  const combinedPairs = [...new Set([
-    ...topVolatilePairs,
-    ...topGainerPairs,
-    ...topVolumePairs,
-  ])];
+    const combinedPairs = [...new Set([
+      ...topVolatilePairs,
+      ...topGainerPairs,
+      ...topVolumePairs,
+    ])];
 
-  console.log(`🔍 Evaluating ${combinedPairs.length} top pairs...`);
+    console.log(`${GREEN}🔍 Evaluating ${combinedPairs.length} top pairs...${RESET}`);
 
-  let bestPick = null;
-
-  for (const pair of combinedPairs) {
-    if (isRecentlyQualified(pair)) {
-      console.log(`⏭️ Skipping ${pair}, already qualified within the last hour.`);
-      continue;
-    }
-
-    console.log(`\n📊 Evaluating pair: ${pair}`);
-
-    try {
-      const strategyResult = await evaluateStrategy(pair);
-
-      // Get strong support/resistance from order book
-      const marketData = await getAdvancedMarketMakers(pair, 1000, exchangeType, 3, 500);
-      const strongSupport = marketData.strongSupport;
-      const strongResistance = marketData.strongResistance;
-
-      const qualifies = strategyResult.buyScore >= 7 || strategyResult.sellScore >= 7;
-
-      if (qualifies) {
-        console.log(`✅ Qualified Pair: ${pair} (Signal: ${strategyResult.signal})`);
-        markAsQualified(pair);
-
-        bestPick = {
-          pair,
-          signal: strategyResult.signal,
-          score: strategyResult.buyScore >= 7 ? strategyResult.buyScore : strategyResult.sellScore,
-          strongSupport,
-          strongResistance
-        };
-        break; // exit after first qualified pair
-      } else {
-        console.log(`❌ Pair ${pair} did not meet score threshold (Buy: ${strategyResult.buyScore}, Sell: ${strategyResult.sellScore})`);
+    for (const pair of combinedPairs) {
+      if (isRecentlyQualified(pair)) {
+        console.log(`${GREEN}⏭️ Skipping ${pair}, already qualified in last hour${RESET}`);
+        continue;
       }
-    } catch (err) {
-      console.error(`⚠️ Error evaluating ${pair}:`, err.message);
+
+      console.log(`${GREEN}📊 Evaluating pair: ${pair}${RESET}`);
+
+      try {
+        const strategyResult = await evaluateStrategy(pair);
+        const marketData = await getAdvancedMarketMakers(pair, 1000, exchangeType, 3, 500);
+
+        // ---------------- Safe numeric defaults ----------------
+        const safeNumber = (value, fallback = 0) =>
+          value != null && !isNaN(Number(value)) ? Number(value) : fallback;
+
+        const strongSupport = marketData.strongSupport || { price: 0, qty: 0 };
+        const strongResistance = marketData.strongResistance || { price: 0, qty: 0 };
+
+        const bestPick = {
+          pair,
+          signal: strategyResult.signal || 'N/A',
+          score: Math.max(safeNumber(strategyResult.buyScore, 0), safeNumber(strategyResult.sellScore, 0)),
+          strongSupport,
+          strongResistance,
+          ltp: safeNumber(marketData.ltp),
+          pipDistance: safeNumber(marketData.pipDistance),
+          profitPercent: safeNumber(marketData.profitPercent),
+          stopLoss: safeNumber(marketData.stopLoss),
+          stopLossPips: safeNumber(marketData.stopLossPips),
+          riskRewardRatio: safeNumber(marketData.riskRewardRatio, 1),
+          suggestedLeverage: safeNumber(marketData.suggestedLeverage, 1),
+          largeBidWalls: Array.isArray(marketData.persistentLargeBidWalls) ? marketData.persistentLargeBidWalls : [],
+          largeAskWalls: Array.isArray(marketData.persistentLargeAskWalls) ? marketData.persistentLargeAskWalls : [],
+        };
+
+        const qualifies = bestPick.score >= 6;
+
+        if (qualifies) {
+          console.log(`${GREEN}✅ Qualified Pair: ${pair} (Signal: ${bestPick.signal})${RESET}`);
+          markAsQualified(pair);
+
+          console.log(`${GREEN}🚀 Selected Pair Metrics:
+Pair: ${bestPick.pair}
+Signal: ${bestPick.signal}
+Score: ${bestPick.score}
+🟢 Strong Support: ${bestPick.strongSupport.price} (Qty=${bestPick.strongSupport.qty})
+🔴 Strong Resistance: ${bestPick.strongResistance.price} (Qty=${bestPick.strongResistance.qty})
+LTP: ${bestPick.ltp}
+Pip Distance: ${bestPick.pipDistance}
+Profit %: ${bestPick.profitPercent}
+Stop Loss: ${bestPick.stopLoss}
+SL Pips: ${bestPick.stopLossPips}
+R/R Ratio: ${bestPick.riskRewardRatio}
+Leverage: ${bestPick.suggestedLeverage}${RESET}`);
+
+          return bestPick; // return first qualified pair
+        } else {
+          console.log(`${GREEN}❌ Pair ${pair} did not meet score threshold (Buy: ${strategyResult.buyScore}, Sell: ${strategyResult.sellScore})${RESET}`);
+        }
+      } catch (err) {
+        console.error(`${GREEN}⚠️ Error evaluating ${pair}: ${err.message}${RESET}`);
+      }
+
+      console.log(`${GREEN}⏳ Waiting 2 seconds before next evaluation...${RESET}`);
+      await delay(2000);
     }
 
-    console.log(`⏳ Waiting 5 seconds before next evaluation...`);
-    await delay(5000);
-  }
+    console.log(`${GREEN}⛔ No pair qualified for trading (score >=6).${RESET}`);
+    return null;
 
-  if (bestPick) {
-    console.log(`\n🚀 Selected Pair to Trade: ${bestPick.pair}`);
-    console.log(`   Signal: ${bestPick.signal} | Score: ${bestPick.score}`);
-    console.log(`   🟢 Strong Support: ${bestPick.strongSupport ? `${bestPick.strongSupport.price} (Qty=${bestPick.strongSupport.qty})` : 'N/A'}`);
-    console.log(`   🔴 Strong Resistance: ${bestPick.strongResistance ? `${bestPick.strongResistance.price} (Qty=${bestPick.strongResistance.qty})` : 'N/A'}`);
-    return bestPick;
-  } else {
-    console.log(`⛔ No pair qualified for trading (score >=5).`);
+  } catch (err) {
+    console.error(`${GREEN}❌ Error fetching top pairs or evaluating: ${err.message}${RESET}`);
     return null;
   }
 }
