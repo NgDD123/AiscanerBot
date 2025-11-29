@@ -73,7 +73,7 @@ async function findBestTradingPair(exchangeType = 'binancefutures') {
           largeAskWalls: Array.isArray(marketData.persistentLargeAskWalls) ? marketData.persistentLargeAskWalls : [],
         };
 
-        const qualifies = bestPick.score >= 6;
+        const qualifies = bestPick.score >= 7;
 
         if (qualifies) {
           console.log(`${GREEN}✅ Qualified Pair: ${pair} (Signal: ${bestPick.signal})${RESET}`);
@@ -105,7 +105,7 @@ Leverage: ${bestPick.suggestedLeverage}${RESET}`);
       await delay(2000);
     }
 
-    console.log(`${GREEN}⛔ No pair qualified for trading (score >=6).${RESET}`);
+    console.log(`${GREEN}⛔ No pair qualified for trading (score >=7).${RESET}`);
     return null;
 
   } catch (err) {

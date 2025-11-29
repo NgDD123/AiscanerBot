@@ -347,10 +347,10 @@ async function evaluateStrategy(symbol, exchangeType = 'binancefutures') {
         }
     }
 
-    if (buyScore >= 6) {
+    if (buyScore >= 7) {
         console.log('Final Decision: BUY');
         return { signal: 'BUY', price: latest.close, buyScore, sellScore };
-    } else if (sellScore >= 6) {
+    } else if (sellScore >= 7) {
         console.log('Final Decision: SELL');
         return { signal: 'SELL', price: latest.close, buyScore, sellScore };
     }
