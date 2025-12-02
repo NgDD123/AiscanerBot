@@ -1,18 +1,35 @@
-// Home.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./Home.css";
 
 import botImage from "../../../assets/freedom ui2-01.png";
 import Faq from "../../Faq";
 import ContactSection from "../ContactusForm";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 /* -----------------------------------------------------------
-   FULL BTC TRADING CARD COMPONENT (LIKE SCREENSHOT)
+   BTC MARKET CARD
 ------------------------------------------------------------ */
 const BTCMarketCard = () => {
   const [tab, setTab] = useState("orderbook");
+
+  useEffect(() => {
+    if (!window.TradingView) return;
+
+    new window.TradingView.widget({
+      autosize: true,
+      symbol: "BTCUSD",
+      interval: "60",
+      container_id: "btc-mini-chart",
+      theme: "dark",
+      style: "1",
+      hide_top_toolbar: true,
+      hide_legend: true,
+      withdateranges: false,
+      details: false,
+      toolbar_bg: "rgba(0,0,0,0)",
+    });
+  }, []);
 
   return (
     <div className="bg-black border border-gray-800 rounded-2xl shadow-xl w-full max-w-3xl mx-auto p-6 text-white mt-16">
@@ -62,37 +79,40 @@ const BTCMarketCard = () => {
         </div>
       </div>
 
-      {/* Chart Placeholder */}
-      <div className="w-full h-60 bg-gray-900 rounded-xl border border-gray-700 mt-6 flex items-center justify-center text-gray-400">
-        📊 Candle Chart Coming Soon
+      {/* LIVE TradingView Chart */}
+      <div className="w-full h-60 mt-6 rounded-xl overflow-hidden border border-gray-700">
+        <div id="btc-mini-chart" style={{ width: "100%", height: "100%" }}></div>
       </div>
 
       {/* Tabs */}
       <div className="flex mt-5 text-sm border-b border-gray-700">
         <button
           onClick={() => setTab("orderbook")}
-          className={`px-4 py-2 ${tab === "orderbook"
-            ? "border-b-2 border-purple-500 font-semibold"
-            : "text-gray-400"
-            }`}
+          className={`px-4 py-2 ${
+            tab === "orderbook"
+              ? "border-b-2 border-purple-500 font-semibold"
+              : "text-gray-400"
+          }`}
         >
           Order book
         </button>
         <button
           onClick={() => setTab("history")}
-          className={`px-4 py-2 ${tab === "history"
-            ? "border-b-2 border-purple-500 font-semibold"
-            : "text-gray-400"
-            }`}
+          className={`px-4 py-2 ${
+            tab === "history"
+              ? "border-b-2 border-purple-500 font-semibold"
+              : "text-gray-400"
+          }`}
         >
           Trade history
         </button>
         <button
           onClick={() => setTab("orders")}
-          className={`px-4 py-2 ${tab === "orders"
-            ? "border-b-2 border-purple-500 font-semibold"
-            : "text-gray-400"
-            }`}
+          className={`px-4 py-2 ${
+            tab === "orders"
+              ? "border-b-2 border-purple-500 font-semibold"
+              : "text-gray-400"
+          }`}
         >
           Orders
         </button>
@@ -141,7 +161,6 @@ const BTCMarketCard = () => {
     </div>
   );
 };
-
 
 /* -----------------------------------------------------------
    PRICING PLANS COMPONENT
@@ -197,8 +216,9 @@ const PricingPlans = () => {
             key={p.id}
             whileHover={{ scale: 1.02, y: -6 }}
             transition={{ duration: 0.2 }}
-            className={`relative rounded-2xl p-8 border ${p.highlight ? "border-purple-600" : "border-purple-700"
-              } bg-gradient-to-b from-gray-900 to-black shadow-lg`}
+            className={`relative rounded-2xl p-8 border ${
+              p.highlight ? "border-purple-600" : "border-purple-700"
+            } bg-gradient-to-b from-gray-900 to-black shadow-lg`}
           >
             {p.highlight && (
               <div className="absolute top-3 right-3 bg-purple-700 text-xs px-3 py-1 rounded-full">
@@ -244,6 +264,94 @@ const PricingPlans = () => {
 };
 
 /* -----------------------------------------------------------
+   LIVE CRYPTO MARKET CARDS
+------------------------------------------------------------ */
+const LiveCryptoCards = () => {
+  const cryptoList = [
+    { name: "Bitcoin", symbol: "BTCUSDT", logo: "https://cryptologos.cc/logos/bitcoin-btc-logo.png" },
+    { name: "Ethereum", symbol: "ETHUSDT", logo: "https://cryptologos.cc/logos/ethereum-eth-logo.png" },
+    { name: "Tether", symbol: "USDTUSDT", logo: "https://cryptologos.cc/logos/tether-usdt-logo.png" },
+    { name: "XRP", symbol: "XRPUSDT", logo: "https://cryptologos.cc/logos/xrp-xrp-logo.png" },
+    { name: "BNB", symbol: "BNBUSDT", logo: "https://cryptologos.cc/logos/bnb-bnb-logo.png" },
+    { name: "USDC", symbol: "USDCUSDT", logo: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png" },
+  ];
+
+  const [prices, setPrices] = useState({});
+  const [usdToRwf, setUsdToRwf] = useState(1300);
+
+  useEffect(() => {
+    const fetchRate = async () => {
+      try {
+        const res = await fetch("https://open.er-api.com/v6/latest/USD");
+        const data = await res.json();
+        if (data && data.rates && data.rates.RWF) setUsdToRwf(data.rates.RWF);
+      } catch (err) {
+        console.error("Failed to fetch USD → RWF rate:", err);
+      }
+    };
+    fetchRate();
+    const interval = setInterval(fetchRate, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const streams = cryptoList.map((c) => `${c.symbol.toLowerCase()}@ticker`).join("/");
+    const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message && message.data) {
+        const data = message.data;
+        setPrices((prev) => ({
+          ...prev,
+          [data.s]: { price: parseFloat(data.c), change: parseFloat(data.P).toFixed(2) },
+        }));
+      }
+    };
+    return () => ws.close();
+  }, []);
+
+  return (
+    <section className="w-full py-16 bg-gray-900 px-4">
+      <div className="text-center mb-10">
+        <h3 className="text-sm tracking-wide text-purple-400 font-semibold mb-2">Live Market Overview</h3>
+        <h2 className="text-3xl md:text-4xl font-extrabold">Cryptocurrency Prices</h2>
+        <p className="text-gray-300 mt-2">Track real-time crypto prices in Rwandan Francs (RWF).</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        {cryptoList.map((crypto) => {
+          const priceData = prices[crypto.symbol] || { price: 0, change: 0 };
+          const priceRwf = (priceData.price * usdToRwf).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          return (
+            <div key={crypto.symbol} className="bg-black border border-gray-800 rounded-2xl p-6 shadow-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <img src={crypto.logo} className="w-10 h-10" alt={crypto.name} />
+                  <div>
+                    <p className="font-bold text-lg">{crypto.name}</p>
+                    <p className="text-gray-400 text-sm">RWF {priceRwf}</p>
+                  </div>
+                </div>
+                <p className={`font-bold ${
+                  parseFloat(priceData.change) > 0 ? "text-green-400" :
+                  parseFloat(priceData.change) < 0 ? "text-red-400" :
+                  "text-gray-400"
+                }`}>
+                  {parseFloat(priceData.change) > 0 ? `↑ ${priceData.change}%` :
+                   parseFloat(priceData.change) < 0 ? `↓ ${Math.abs(priceData.change)}%` :
+                   `○ ${priceData.change}%`}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+/* -----------------------------------------------------------
    HOME PAGE
 ------------------------------------------------------------ */
 const Home = () => {
@@ -282,9 +390,7 @@ const Home = () => {
         </div>
       </div>
 
-      {/* -------------------------------------------------------
-         CHOOSE YOUR TRADING PLAN
-      -------------------------------------------------------- */}
+      {/* TRADING PLANS */}
       <section className="w-full py-16 bg-black px-4">
         <div className="text-center mb-8">
           <h2 className="text-4xl md:text-5xl font-bold">
@@ -293,146 +399,16 @@ const Home = () => {
             </span>
           </h2>
 
-          <p className="text-gray-300 mt-3">
-            Select the perfect plan for your trading needs.
-          </p>
+          <p className="text-gray-300 mt-3">Select the perfect plan for your trading needs.</p>
         </div>
 
         <PricingPlans />
       </section>
 
-      {/* -------------------------------------------------------
-         LIVE CRYPTO MARKET CARDS (NEW SECTION ADDED)
-      -------------------------------------------------------- */}
-      <section className="w-full py-16 bg-gray-900 px-4">
-        <div className="text-center mb-10">
-          <h3 className="text-sm tracking-wide text-purple-400 font-semibold mb-2">
-            Live Market Overview
-          </h3>
+      {/* LIVE CRYPTO CARDS */}
+      <LiveCryptoCards />
 
-          <h2 className="text-3xl md:text-4xl font-extrabold">
-            Cryptocurrency Prices
-          </h2>
-
-          <p className="text-gray-300 mt-2">
-            Track real-time crypto prices based on global market movements.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {/* Bitcoin */}
-          <div className="bg-black border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img
-                  src="https://cryptologos.cc/logos/bitcoin-btc-logo.png"
-                  className="w-10 h-10"
-                  alt="BTC"
-                />
-                <div>
-                  <p className="font-bold text-lg">Bitcoin</p>
-                  <p className="text-gray-400 text-sm">RWF 127,284,087.21</p>
-                </div>
-              </div>
-              <p className="text-green-400 font-bold">↑ 1.08%</p>
-            </div>
-          </div>
-
-          {/* Ethereum */}
-          <div className="bg-black border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img
-                  src="https://cryptologos.cc/logos/ethereum-eth-logo.png"
-                  className="w-10 h-10"
-                  alt="ETH"
-                />
-                <div>
-                  <p className="font-bold text-lg">Ethereum</p>
-                  <p className="text-gray-400 text-sm">RWF 4,117,249.54</p>
-                </div>
-              </div>
-              <p className="text-red-400 font-bold">↓ 0.83%</p>
-            </div>
-          </div>
-
-          {/* USDT */}
-          <div className="bg-black border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img
-                  src="https://cryptologos.cc/logos/tether-usdt-logo.png"
-                  className="w-10 h-10"
-                  alt="USDT"
-                />
-                <div>
-                  <p className="font-bold text-lg">Tether</p>
-                  <p className="text-gray-400 text-sm">RWF 1,456.82</p>
-                </div>
-              </div>
-              <p className="text-green-400 font-bold">↑ 0.02%</p>
-            </div>
-          </div>
-
-          {/* XRP */}
-          <div className="bg-black border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img
-                  src="https://cryptologos.cc/logos/xrp-xrp-logo.png"
-                  className="w-10 h-10"
-                  alt="XRP"
-                />
-                <div>
-                  <p className="font-bold text-lg">XRP</p>
-                  <p className="text-gray-400 text-sm">RWF 2,967.76</p>
-                </div>
-              </div>
-              <p className="text-red-400 font-bold">↓ 0.22%</p>
-            </div>
-          </div>
-
-          {/* BNB */}
-          <div className="bg-black border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img
-                  src="https://cryptologos.cc/logos/bnb-bnb-logo.png"
-                  className="w-10 h-10"
-                  alt="BNB"
-                />
-                <div>
-                  <p className="font-bold text-lg">BNB</p>
-                  <p className="text-gray-400 text-sm">RWF 1,230,041.77</p>
-                </div>
-              </div>
-              <p className="text-green-400 font-bold">↑ 2.28%</p>
-            </div>
-          </div>
-
-          {/* USDC */}
-          <div className="bg-black border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img
-                  src="https://cryptologos.cc/logos/usd-coin-usdc-logo.png"
-                  className="w-10 h-10"
-                  alt="USDC"
-                />
-                <div>
-                  <p className="font-bold text-lg">USDC</p>
-                  <p className="text-gray-400 text-sm">RWF 1,456.82</p>
-                </div>
-              </div>
-              <p className="text-gray-400 font-bold">○ 0.00%</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* -------------------------------------------------------
-         POWERFUL FEATURES — ADVANCED TRADING TOOLS
-      -------------------------------------------------------- */}
+      {/* POWERFUL FEATURES */}
       <section className="w-full py-20 bg-[#0b0b0e] px-4">
         <div className="text-center mb-14">
           <h3 className="text-sm tracking-wide text-purple-400 font-semibold mb-3">
@@ -456,7 +432,7 @@ const Home = () => {
           transition={{ duration: 0.6 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto"
         >
-          {/* Card 1 */}
+          {/* Feature Cards */}
           <div className="bg-black border border-gray-800 rounded-2xl p-8 shadow-lg">
             <div className="w-12 h-12 flex items-center justify-center rounded-full bg-purple-700 mb-5">
               <span className="text-xl">📈</span>
@@ -471,7 +447,6 @@ const Home = () => {
             </p>
           </div>
 
-          {/* Card 2 */}
           <div className="bg-black border border-gray-800 rounded-2xl p-8 shadow-lg">
             <div className="w-12 h-12 flex items-center justify-center rounded-full bg-purple-700 mb-5">
               <span className="text-xl">🔒</span>
@@ -486,14 +461,11 @@ const Home = () => {
             </p>
           </div>
 
-          {/* Card 3 */}
           <div className="bg-black border border-gray-800 rounded-2xl p-8 shadow-lg">
             <div className="w-12 h-12 flex items-center justify-center rounded-full bg-purple-700 mb-5">
               <span className="text-xl">⚙️</span>
             </div>
-            <h3 className="text-xl font-bold mb-2">
-              Customizable Strategies
-            </h3>
+            <h3 className="text-xl font-bold mb-2">Customizable Strategies</h3>
             <p className="text-gray-400 text-sm mb-4">
               Tailor the bot to your trading preferences.
             </p>
