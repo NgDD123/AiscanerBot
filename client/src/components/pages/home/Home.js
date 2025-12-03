@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./Home.css";
 
 import botImage from "../../../assets/freedom ui2-01.png";
@@ -161,6 +161,207 @@ const BTCMarketCard = () => {
     </div>
   );
 };
+/* ----------------------------------------------------------- 
+   LIVE CRYPTO MARKET CARDS WITH TRADINGVIEW WIDGETS
+------------------------------------------------------------ */
+const LiveCryptoCards = () => {
+  const cryptoList = [
+    {
+      name: "Bitcoin",
+      symbol: "BTCUSDT",
+      tvSymbol: "BINANCE:BTCUSDT",
+      logo: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+    },
+    {
+      name: "Ethereum",
+      symbol: "ETHUSDT",
+      tvSymbol: "BINANCE:ETHUSDT",
+      logo: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+    },
+    {
+      name: "Tether",
+      symbol: "USDTUSDT",
+      tvSymbol: "BINANCE:USDTUSDT",
+      logo: "https://cryptologos.cc/logos/tether-usdt-logo.png",
+    },
+  ];
+
+  const [prices, setPrices] = useState({});
+  const [usdToRwf, setUsdToRwf] = useState(1300);
+  const [selectedSymbol, setSelectedSymbol] = useState(cryptoList[0].tvSymbol);
+
+  const mainChartRef = useRef(null);
+  const miniChartRefs = useRef({});
+
+  /* ------------------------------ FX RATE ------------------------------ */
+  useEffect(() => {
+    const fetchRate = async () => {
+      try {
+        const res = await fetch("https://open.er-api.com/v6/latest/USD");
+        const data = await res.json();
+        if (data?.rates?.RWF) setUsdToRwf(data.rates.RWF);
+      } catch (err) {
+        console.error("Failed to fetch FX rate:", err);
+      }
+    };
+
+    fetchRate();
+    const interval = setInterval(fetchRate, 600000);
+    return () => clearInterval(interval);
+  }, []);
+
+  /* ------------------------------ LIVE PRICE STREAM ------------------------------ */
+  useEffect(() => {
+    const streamNames = cryptoList
+      .map((c) => `${c.symbol.toLowerCase()}@ticker`)
+      .join("/");
+    const ws = new WebSocket(
+      `wss://stream.binance.com:9443/stream?streams=${streamNames}`
+    );
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      const d = msg?.data;
+      if (!d) return;
+
+      setPrices((prev) => ({
+        ...prev,
+        [d.s]: {
+          price: parseFloat(d.c),
+          change: parseFloat(d.P).toFixed(2),
+        },
+      }));
+    };
+
+    return () => ws.close();
+  }, []);
+
+  /* ------------------------------ MAIN TRADINGVIEW WIDGET ------------------------------ */
+  useEffect(() => {
+    if (!window.TradingView || !mainChartRef.current) return;
+
+    mainChartRef.current.innerHTML = ""; // Clear previous chart
+
+    new window.TradingView.widget({
+      autosize: true,
+      symbol: selectedSymbol,
+      interval: "60",
+      container_id: "main-tradingview-chart",
+      theme: "light",
+      style: 3,
+      hide_top_toolbar: true,
+      hide_legend: true,
+      hide_volume: true,
+      withdateranges: false,
+      details: false,
+      toolbar_bg: "rgba(0,0,0,0)",
+    });
+  }, [selectedSymbol]);
+
+  /* ------------------------------ MINI WIDGETS ------------------------------ */
+  useEffect(() => {
+    cryptoList.forEach((c) => {
+      if (!window.TradingView || !miniChartRefs.current[c.symbol]) return;
+
+      // Clear previous widget if exists
+      miniChartRefs.current[c.symbol].innerHTML = "";
+
+      new window.TradingView.widget({
+        autosize: true,
+        symbol: c.tvSymbol,
+        interval: "60",
+        container_id: `mini-chart-${c.symbol}`,
+        theme: "light",
+        style: 1,
+        hide_top_toolbar: true,
+        hide_legend: true,
+        withdateranges: false,
+        details: false,
+        toolbar_bg: "rgba(0,0,0,0)",
+      });
+    });
+  }, [cryptoList]);
+
+  return (
+    <section className="w-full px-4 py-10 bg-white md:flex md:gap-10">
+      {/* LEFT — PRICE + MAIN CHART */}
+      <div className="w-full md:w-2/3">
+        {/* Time Tabs */}
+        <div className="flex gap-4 mb-4">
+          <button className="bg-red-100 text-red-600 font-semibold px-3 py-1 rounded-lg">
+            1H
+          </button>
+          <button className="text-gray-500">1D</button>
+          <button className="text-gray-500">1W</button>
+          <button className="text-gray-500">1M</button>
+        </div>
+
+        {/* MAIN DISPLAY PRICE */}
+        <h1 className="text-4xl font-bold">
+          RWF{" "}
+          {prices["BTCUSDT"]
+            ? (prices["BTCUSDT"].price * usdToRwf).toLocaleString()
+            : "0"}
+        </h1>
+
+        <p className="text-red-500 text-lg mt-1">↓ 0.22%</p>
+
+        {/* MAIN TRADINGVIEW CHART */}
+        <div
+          ref={mainChartRef}
+          id="main-tradingview-chart"
+          style={{ width: "100%", height: "300px" }}
+          className="mt-6 rounded-xl overflow-hidden border border-gray-200"
+        ></div>
+      </div>
+
+      {/* RIGHT — TOP ASSETS LIST WITH MINI CHARTS */}
+      <div className="w-full md:w-1/3 mt-10 md:mt-0 space-y-6">
+        <h2 className="text-xl font-bold mb-4">Top Assets</h2>
+
+        {cryptoList.map((c) => {
+          const p = prices[c.symbol] || { price: 0, change: 0 };
+          const priceRwf = (p.price * usdToRwf).toLocaleString();
+
+          return (
+            <div
+              key={c.symbol}
+              className="bg-gray-50 rounded-xl p-4 cursor-pointer shadow hover:shadow-md"
+              onClick={() => setSelectedSymbol(c.tvSymbol)}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <img src={c.logo} className="w-8 h-8" alt={c.name} />
+                  <div>
+                    <p className="font-semibold">{c.name}</p>
+                    <p className="text-gray-500 text-sm">RWF {priceRwf}</p>
+                  </div>
+                </div>
+                <p
+                  className={
+                    p.change >= 0
+                      ? "text-green-500 font-bold"
+                      : "text-red-500 font-bold"
+                  }
+                >
+                  {p.change >= 0 ? `↑ ${p.change}%` : `↓ ${p.change}%`}
+                </p>
+              </div>
+
+              {/* MINI TRADINGVIEW CHART */}
+              <div
+                id={`mini-chart-${c.symbol}`}
+                ref={(el) => (miniChartRefs.current[c.symbol] = el)}
+                style={{ width: "100%", height: "80px" }}
+                className="rounded-lg overflow-hidden border border-gray-200"
+              ></div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
 
 /* -----------------------------------------------------------
    PRICING PLANS COMPONENT
@@ -266,7 +467,7 @@ const PricingPlans = () => {
 /* -----------------------------------------------------------
    LIVE CRYPTO MARKET CARDS
 ------------------------------------------------------------ */
-const LiveCryptoCards = () => {
+const LiveCryptoCard = () => {
   const cryptoList = [
     { name: "Bitcoin", symbol: "BTCUSDT", logo: "https://cryptologos.cc/logos/bitcoin-btc-logo.png" },
     { name: "Ethereum", symbol: "ETHUSDT", logo: "https://cryptologos.cc/logos/ethereum-eth-logo.png" },
@@ -362,33 +563,47 @@ const Home = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-[20rem] w-full text-white">
-      {/* HERO */}
-      <div className="flex flex-col gap-y-8 md:flex-row justify-between py-10 px-4 bg-gray-900 rounded-xl">
-        <div className="flex flex-col basis-1/2 gap-y-6">
-          <p className="bg-gradient-to-r from-white via-purple-600 to-major-text-style bg-clip-text text-4xl md:text-5xl font-bold text-transparent">
-            Freedom Trading Bot
-          </p>
+  <div className="flex flex-col min-h-[20rem] w-full text-white">
+  {/* HERO */}
+  <div className="flex flex-col gap-y-8 py-10 px-4 bg-gray-900 rounded-xl">
+    {/* Top content */}
+    <div className="flex flex-col gap-y-6">
+      <p className="bg-gradient-to-r from-white via-purple-600 to-purple-400 bg-clip-text text-4xl md:text-5xl font-bold text-transparent">
+        Freedom Trading Bot
+      </p>
 
-          <div className="md:w-[85%] text-lg text-white font-medium">
-            Unlock your financial freedom with our Freedom trading bot and move
-            to the moon of success, maximizing profits effortlessly while you
-            focus on what matters.
-          </div>
-
-          <button
-            onClick={handleBookDemo}
-            className="p-2 rounded-2xl bg-white text-purple-600 w-[90%] mx-auto md:mx-0 md:w-40 font-bold"
-          >
-            BOOK A DEMO
-          </button>
-          <BTCMarketCard />
-        </div>
-
-        <div className="basis-1/2 flex justify-center">
-          {/* <img src={botImage} alt="Bot" className="max-w-xs md:max-w-md" /> */}
-        </div>
+      <div className="text-lg text-white font-medium">
+        Unlock your financial freedom with our Freedom trading bot and move
+        to the moon of success, maximizing profits effortlessly while you
+        focus on what matters.
       </div>
+
+      {/* Demo Button */}
+      <button
+        onClick={handleBookDemo}
+        className="p-2 rounded-2xl bg-white text-purple-600 w-full md:w-40 font-bold"
+      >
+        BOOK A DEMO
+      </button>
+    </div>
+
+    {/* Cards Section */}
+    <div className="flex flex-col md:flex-row gap-6 mt-6 w-full">
+      {/* Left card: full width, independent height */}
+      <div className="flex-1 w-120 rounded-2xl overflow-hidden">
+        <BTCMarketCard />
+      </div>
+
+      {/* Right card: full width on mobile, fixed width on desktop, independent height */}
+      <div className="w-full md:w-3/5 h-100 mt-24 rounded-2xl overflow-hidden">
+        <LiveCryptoCards />
+      </div>
+    </div>
+  </div>
+
+
+
+
 
       {/* TRADING PLANS */}
       <section className="w-full py-16 bg-black px-4">
@@ -404,9 +619,11 @@ const Home = () => {
 
         <PricingPlans />
       </section>
+       {/* FIRST LIVE CRYPTO CARDS */}
+      <LiveCryptoCard />
 
-      {/* LIVE CRYPTO CARDS */}
-      <LiveCryptoCards />
+      
+      
 
       {/* POWERFUL FEATURES */}
       <section className="w-full py-20 bg-[#0b0b0e] px-4">
