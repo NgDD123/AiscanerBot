@@ -19,18 +19,18 @@ const NavLinks = ({ profileInfo }) => {
   // Signed-in user links (example dropdown for Trade/Futures)
   const userMenus = [
     {
-      title: "Trade",
-      items: [
-        { name: "Trade Futures", path: "/trade" },
-        { name: "Trade Charts", path: "/trade-chart" },
-      ],
+      // title: "Trade",
+      // items: [
+      //   { name: "Trade Futures", path: "/trade" },
+      //   { name: "Trade Charts", path: "/trade-chart" },
+      // ],
     },
     {
-      title: "Resources",
-      items: [
-        { name: "Trading Tips", path: "/tips" },
-        { name: "Analysis Tools", path: "/analysis" },
-      ],
+      // title: "Resources",
+      // items: [
+      //   { name: "Trading Tips", path: "/tips" },
+      //   { name: "Analysis Tools", path: "/analysis" },
+      // ],
     },
   ];
 

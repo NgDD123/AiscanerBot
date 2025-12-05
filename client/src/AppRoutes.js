@@ -24,6 +24,7 @@ import ViewBlogModal from "./components/pages/Blog/ViewBlogModal";
 import QualifiedPairsList from "./components/pages/scanerStore/QualifiedPairsList";
 import ChartPage from "./components/pages/scanerStore/ChartPage";
 import FinancialCourses from "./components/pages/FinancialCourses"
+import TradingTips from "./components/pages/TradingTips";
 function AppRoutes() {
   const userInfo = useSelector((state) => state?.user?.user?.user);
 
@@ -56,6 +57,8 @@ function AppRoutes() {
           <Route path="/about" element={<About />} />
           <Route path="/about" element={<About />} />
           <Route path="/courses" element={<FinancialCourses/>}/>
+           <Route path="/tips" element={<TradingTips/>}/>
+
         </Route>
 
         {/* Admin routes  */}
