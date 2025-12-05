@@ -11,6 +11,7 @@ const NavLinks = ({ profileInfo }) => {
     { title: "Home", path: "/" },
     { title: "Trading Tips", path: "/tips" },
     { title: "Chart", path: "/trade-chart" },
+    { title: "Stock Market courses", path: "/courses" },
     { title: "About Us", path: "/about" },
     { title: "Contact Us", path: "/contact" },
   ];

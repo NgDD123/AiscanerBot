@@ -4,6 +4,7 @@ import AdminDashboard from "./components/pages/Admin/AdminDashboard";
 import UserDashboard from "./components/pages/UserDashboard";
 import CheckoutPage from "./components/pages/checkout/checkoutPage";
 import Contact from "./components/pages/contact";
+import About from "./components/pages/aboutUs";
 import Home from "./components/pages/home/Home";
 import Trade from "./components/pages/Trade";
 import Login from "./components/pages/Login";
@@ -22,6 +23,7 @@ import EditBlogModal from "./components/pages/Blog/EditBlogModal";
 import ViewBlogModal from "./components/pages/Blog/ViewBlogModal";
 import QualifiedPairsList from "./components/pages/scanerStore/QualifiedPairsList";
 import ChartPage from "./components/pages/scanerStore/ChartPage";
+import FinancialCourses from "./components/pages/FinancialCourses"
 function AppRoutes() {
   const userInfo = useSelector((state) => state?.user?.user?.user);
 
@@ -49,13 +51,18 @@ function AppRoutes() {
         <Route element={<AuthLayout />}>
           <Route path="signup" element={<OnBoardSignUp />} />
         </Route>
+        <Route element={<AuthLayout/>}>
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/courses" element={<FinancialCourses/>}/>
+        </Route>
 
         {/* Admin routes  */}
         <Route element={<DashboardLayout links={(userInfo?.email === "ngiriyezadavid2@gmail.com") ? AdminRoutes : UserRoutes} />}>
 
           <Route path="/trade" element={<Trade />} />
           <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/contact" element={<Contact />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/user" element={<UserDashboard />} />
           <Route path="/profile" element={<ProfilePage />} />
