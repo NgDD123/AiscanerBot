@@ -88,31 +88,28 @@ const BTCMarketCard = () => {
       <div className="flex mt-5 text-sm border-b border-gray-700">
         <button
           onClick={() => setTab("orderbook")}
-          className={`px-4 py-2 ${
-            tab === "orderbook"
+          className={`px-4 py-2 ${tab === "orderbook"
               ? "border-b-2 border-purple-500 font-semibold"
               : "text-gray-400"
-          }`}
+            }`}
         >
           Order book
         </button>
         <button
           onClick={() => setTab("history")}
-          className={`px-4 py-2 ${
-            tab === "history"
+          className={`px-4 py-2 ${tab === "history"
               ? "border-b-2 border-purple-500 font-semibold"
               : "text-gray-400"
-          }`}
+            }`}
         >
           Trade history
         </button>
         <button
           onClick={() => setTab("orders")}
-          className={`px-4 py-2 ${
-            tab === "orders"
+          className={`px-4 py-2 ${tab === "orders"
               ? "border-b-2 border-purple-500 font-semibold"
               : "text-gray-400"
-          }`}
+            }`}
         >
           Orders
         </button>
@@ -417,9 +414,8 @@ const PricingPlans = () => {
             key={p.id}
             whileHover={{ scale: 1.02, y: -6 }}
             transition={{ duration: 0.2 }}
-            className={`relative rounded-2xl p-8 border ${
-              p.highlight ? "border-purple-600" : "border-purple-700"
-            } bg-gradient-to-b from-gray-900 to-black shadow-lg`}
+            className={`relative rounded-2xl p-8 border ${p.highlight ? "border-purple-600" : "border-purple-700"
+              } bg-gradient-to-b from-gray-900 to-black shadow-lg`}
           >
             {p.highlight && (
               <div className="absolute top-3 right-3 bg-purple-700 text-xs px-3 py-1 rounded-full">
@@ -534,14 +530,13 @@ const LiveCryptoCard = () => {
                     <p className="text-gray-400 text-sm">RWF {priceRwf}</p>
                   </div>
                 </div>
-                <p className={`font-bold ${
-                  parseFloat(priceData.change) > 0 ? "text-green-400" :
-                  parseFloat(priceData.change) < 0 ? "text-red-400" :
-                  "text-gray-400"
-                }`}>
+                <p className={`font-bold ${parseFloat(priceData.change) > 0 ? "text-green-400" :
+                    parseFloat(priceData.change) < 0 ? "text-red-400" :
+                      "text-gray-400"
+                  }`}>
                   {parseFloat(priceData.change) > 0 ? `↑ ${priceData.change}%` :
-                   parseFloat(priceData.change) < 0 ? `↓ ${Math.abs(priceData.change)}%` :
-                   `○ ${priceData.change}%`}
+                    parseFloat(priceData.change) < 0 ? `↓ ${Math.abs(priceData.change)}%` :
+                      `○ ${priceData.change}%`}
                 </p>
               </div>
             </div>
@@ -563,43 +558,43 @@ const Home = () => {
   };
 
   return (
-  <div className="flex flex-col min-h-[20rem] w-full text-white">
-  {/* HERO */}
-  <div className="flex flex-col gap-y-8 py-10 px-4 bg-gray-900 rounded-xl">
-    {/* Top content */}
-    <div className="flex flex-col gap-y-6">
-      <p className="bg-gradient-to-r from-white via-purple-600 to-purple-400 bg-clip-text text-4xl md:text-5xl font-bold text-transparent">
-        Freedom Trading Bot
-      </p>
+    <div className="flex flex-col min-h-[20rem] w-full text-white">
+      {/* HERO */}
+      <div className="flex flex-col gap-y-8 py-10 px-4 bg-gray-900 rounded-xl">
+        {/* Top content */}
+        <div className="flex flex-col gap-y-6">
+          <p className="bg-gradient-to-r from-white via-purple-600 to-purple-400 bg-clip-text text-4xl md:text-5xl font-bold text-transparent">
+            Freedom Trading Bot
+          </p>
 
-      <div className="text-lg text-white font-medium">
-        Unlock your financial freedom with our Freedom trading bot and move
-        to the moon of success, maximizing profits effortlessly while you
-        focus on what matters.
+          <div className="text-lg text-white font-medium">
+            Unlock your financial freedom with our Freedom trading bot and move
+            to the moon of success, maximizing profits effortlessly while you
+            focus on what matters.
+          </div>
+
+          {/* Demo Button */}
+          <button
+            onClick={handleBookDemo}
+            className="p-2 rounded-2xl bg-white text-purple-600 w-full md:w-40 font-bold"
+          >
+            BOOK A DEMO
+          </button>
+        </div>
+
+        {/* Cards Section */}
+        <div className="flex flex-col md:flex-row gap-6 mt-6 w-full">
+          {/* Left card: full width, independent height */}
+          <div className="flex-1 w-120 rounded-2xl overflow-hidden">
+            <BTCMarketCard />
+          </div>
+
+          {/* Right card: full width on mobile, fixed width on desktop, independent height */}
+          <div className="w-full md:w-3/5 h-100 mt-24 rounded-2xl overflow-hidden">
+            <LiveCryptoCards />
+          </div>
+        </div>
       </div>
-
-      {/* Demo Button */}
-      <button
-        onClick={handleBookDemo}
-        className="p-2 rounded-2xl bg-white text-purple-600 w-full md:w-40 font-bold"
-      >
-        BOOK A DEMO
-      </button>
-    </div>
-
-    {/* Cards Section */}
-    <div className="flex flex-col md:flex-row gap-6 mt-6 w-full">
-      {/* Left card: full width, independent height */}
-      <div className="flex-1 w-120 rounded-2xl overflow-hidden">
-        <BTCMarketCard />
-      </div>
-
-      {/* Right card: full width on mobile, fixed width on desktop, independent height */}
-      <div className="w-full md:w-3/5 h-100 mt-24 rounded-2xl overflow-hidden">
-        <LiveCryptoCards />
-      </div>
-    </div>
-  </div>
 
 
 
@@ -619,11 +614,11 @@ const Home = () => {
 
         <PricingPlans />
       </section>
-       {/* FIRST LIVE CRYPTO CARDS */}
+      {/* FIRST LIVE CRYPTO CARDS */}
       <LiveCryptoCard />
 
-      
-      
+
+
 
       {/* POWERFUL FEATURES */}
       <section className="w-full py-20 bg-[#0b0b0e] px-4">

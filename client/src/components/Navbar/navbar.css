@@ -3,7 +3,7 @@
   width: 100%;
   display: flex;
   justify-content: space-between;
-  background-color: #220314bb;
+  /* background-color: #220314bb; */
   padding: 10px 20px; /* Adjusted padding for desktop */
   height: 50px;
   position: sticky;
