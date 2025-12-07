@@ -179,7 +179,7 @@ const About = () => {
               className="p-6 bg-gray-800 rounded-2xl shadow-lg border border-gray-700 text-center"
             >
               <img
-                src={member.image}
+                // src={member.image}
                 alt={member.name}
                 className="w-32 h-32 mx-auto rounded-full mb-4 border-4 border-purple-500"
               />

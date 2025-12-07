@@ -2,13 +2,14 @@ import { useContext } from "react";
 import { IoMenu } from "react-icons/io5";
 import { CiGlobe } from "react-icons/ci";
 import { FaRegBell } from "react-icons/fa";
-import { useSelector, useDispatch } from "react-redux";
 import { signOut } from "firebase/auth";
+import { useDispatch } from "react-redux";
+
 import { auth } from "../../firebase";
 import { logout } from "../../redux/slice/userSlice";
 
-import NavLinks from "./NavLinks"; // adjust path if needed
 import Logo from "../Logo";
+import NavLinks from "./NavLinks";
 import SearchBar from "../Search";
 import ProfileCard from "../Profile";
 import { NotificationButton } from "../Button";
@@ -19,7 +20,6 @@ const DashboardNavigationBar = ({ profileInfo }) => {
   const dispatch = useDispatch();
   const userInfo = profileInfo;
 
-  // Handle Sign In / Sign Out
   const handleAuthClick = () => {
     if (userInfo) {
       dispatch(logout());
@@ -31,55 +31,70 @@ const DashboardNavigationBar = ({ profileInfo }) => {
   };
 
   return (
-    <div className="glass_morphism border-gray-border border-b-[0.6px] min-h-[60px] px-6 w-full flex items-center gap-6 z-20 relative">
-
-      {/* LEFT */}
-      <div className="flex items-center gap-x-6 shrink-0">
-        <div
-          className="md:hidden w-10 h-10 flex items-center justify-center"
+    <header className="
+      fixed top-0 left-0 w-full z-40
+      backdrop-blur-lg bg-[#0a0a0ab3]
+      border-b border-[#ffffff1a]
+      px-6 py-3 flex items-center gap-6
+      shadow-[0_4px_16px_rgba(0,0,0,0.25)]
+    ">
+      
+      {/* Left side */}
+      <div className="flex items-center gap-4 shrink-0">
+        {/* Mobile menu */}
+        <button
           onClick={handleOpenSidebar}
+          className="md:hidden p-2 rounded-lg hover:bg-white/10 transition"
         >
-          <IoMenu className="text-4xl text-white" />
-        </div>
+          <IoMenu className="text-3xl text-white" />
+        </button>
+
         <Logo />
       </div>
 
-      {/* CENTER NAV LINKS */}
-      <div className="flex-1 flex justify-center">
+      {/* Center links (desktop only) */}
+      <nav className="hidden md:flex flex-1 justify-center">
         <NavLinks profileInfo={profileInfo} />
-      </div>
+      </nav>
 
-      {/* RIGHT */}
-      <div className="flex items-center gap-x-4 shrink-0">
+      {/* Right side */}
+      <div className="flex items-center gap-4 shrink-0">
 
-        <SearchBar />
+        <div className="hidden md:block">
+          <SearchBar />
+        </div>
 
         <NotificationButton icon={CiGlobe} />
         <NotificationButton icon={FaRegBell} />
 
         {userInfo ? (
-          // Logged-in: show profile card + Sign Out button
           <>
             <ProfileCard username={userInfo.username} email={userInfo.email} />
             <button
               onClick={handleAuthClick}
-              className="bg-red-600 text-white px-3 py-1 rounded-2xl text-sm hover:bg-red-500 transition"
+              className="
+                px-4 py-1.5 rounded-xl text-sm
+                bg-red-600 hover:bg-red-500
+                text-white transition font-semibold
+              "
             >
               Sign Out
             </button>
           </>
         ) : (
-          // Guest: show Sign In button
           <button
             onClick={handleAuthClick}
-            className="bg-purple-600 text-white px-4 py-1 rounded-2xl text-sm hover:bg-purple-500 transition"
+            className="
+              px-5 py-1.5 rounded-xl text-sm
+              bg-purple-600 hover:bg-purple-500
+              text-white transition font-semibold
+            "
           >
             Sign In
           </button>
         )}
-
       </div>
-    </div>
+    </header>
   );
 };
 

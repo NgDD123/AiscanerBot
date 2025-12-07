@@ -1,23 +1,26 @@
-import { CtaButton } from "../Button";
 import Logo from "../Logo";
-import "../pages/on-board.css";
-const AuthNavbar = (props) => {
+import { CtaButton } from "../Button";
+
+const AuthNavbar = ({ action, onClick }) => {
   return (
-    <section className="glass_morphism w-[97%] mx-auto p-3 fixed z-20">
-      <div className="flex w-full justify-between items-center">
-        <div className="basis-1/2 flex justify-between items-center">
-          <Logo />
-        </div>
-        <div className="md:basis-1/2 flex items-center justify-end">
-          <CtaButton
-            text={props.action}
-            isAuth={false}
-            onClick={props.onClick}
-            className={"leading-6 font-bold py-[10px] bg-major-text-style"}
-          />
-        </div>
+    <header className="
+      fixed top-0 left-0 w-full z-30
+      backdrop-blur-xl bg-[#0a0a0acc]
+      px-6 py-3 shadow-lg border-b border-white/10
+    ">
+      <div className="flex justify-between items-center w-[97%] mx-auto">
+
+        <Logo />
+
+        <CtaButton
+          text={action}
+          isAuth={false}
+          onClick={onClick}
+          className="leading-6 font-bold py-3 px-6 bg-major-text-style rounded-xl"
+        />
       </div>
-    </section>
+    </header>
   );
 };
+
 export default AuthNavbar;
