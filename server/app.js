@@ -559,24 +559,23 @@ app.post('/api/execute-trade', async (req, res) => {
   console.log("------ [DEBUG] /api/execute-trade ROUTE CALLED ------");
 
   try {
-    const { apiKey, apiSecretKey, symbol, tradeDecision, exchangeType, options } = req.body;
-    
+    const { apiKey, apiSecretKey, symbol, tradeDecision, exchangeType, options, monitorTimeoutMs, monitorIntervalMs } = req.body;
 
-    console.log("[DEBUG] Incoming Body:", { symbol, tradeDecision, exchangeType, options });
-   
+    console.log("[DEBUG] Incoming Body:", { symbol, tradeDecision, exchangeType, options, monitorTimeoutMs, monitorIntervalMs });
 
     if (!apiKey || !apiSecretKey || !symbol || !exchangeType) {
       return res.status(400).json({ error: 'API key, secret, symbol, or exchange type not provided' });
     }
 
     const exType = exchangeType.toLowerCase().trim();
-    if (!['binance', 'binancefutures', 'binancefuturestestnet', 'binancetestnet'].includes(exType)) {
+    if (!['binancefutures', 'binancefuturestestnet', 'binancetestnet'].includes(exType)) {
       return res.status(400).json({ error: 'Invalid exchange type provided', received: exType });
     }
 
     if (!tradeDecision) {
       return res.status(400).json({ error: 'tradeDecision is required (Buy / Sell / Hold)' });
     }
+
     if (tradeDecision.toLowerCase() === 'hold') {
       console.log("[DEBUG] decision hold");
       return res.json({ message: 'No trade executed. Decision is Hold.' });
@@ -584,57 +583,82 @@ app.post('/api/execute-trade', async (req, res) => {
 
     // Fetch last price
     const baseUrl = getBinanceBaseUrl(exType);
-    const priceEndpoint = exType.includes('futures')
-      ? `${baseUrl}/fapi/v1/ticker/price?symbol=${symbol}`
-      : `${baseUrl}/api/v3/ticker/price?symbol=${symbol}`;
-
+    const priceEndpoint = `${baseUrl}/fapi/v1/ticker/price?symbol=${symbol}`;
     const lastPriceResp = await fetch(priceEndpoint);
     if (!lastPriceResp.ok) return res.status(502).json({ error: 'Failed to fetch last price' });
     const { price: lastPrice } = await lastPriceResp.json();
 
-    // Fetch account info
-    const accountInfo = await getAccountInfoFromBinance(apiKey, apiSecretKey, exType);
-    const availableUSDT = parseFloat(exType.includes('futures') ? accountInfo.availableBalance : accountInfo.free);
-    if (!availableUSDT || availableUSDT <= 0) {
-      return res.status(400).json({ error: 'Insufficient funds', availableUSDT });
-    }
+    console.log("[DEBUG] Calling executeTrade() engine, LIMIT order at strong support/resistance...");
 
-    if (!exType.includes('futures')) {
-      return res.status(400).json({ error: 'Spot trading not implemented. Use a futures exchangeType.' });
-    }
+    const timeoutMs = monitorTimeoutMs || 120000; // default 2 minutes
+    const intervalMs = monitorIntervalMs || 3000;  // default 3 seconds
 
-    console.log("[DEBUG] Calling executeTrade() engine with timeout safeguard...");
+    const monitorOrderUntilFilled = async () => {
+      const tradePromise = executeTrade(
+        apiKey,
+        apiSecretKey,
+        symbol,
+        tradeDecision,
+        parseFloat(lastPrice),
+        exType,
+        null, // userEmail optional
+        null, // strongSupport
+        null, // strongResistance
+        3,
+        options ?? {}
+      );
 
-    // ⚡ Timeout wrapper
-    const executeWithTimeout = (timeoutMs) => {
-      return Promise.race([
-        executeTrade(
-          apiKey,
-          apiSecretKey,
-          symbol,
-          tradeDecision,
-          parseFloat(lastPrice),
-          exType,
-          availableUSDT,
-          
-          null, // strongSupport fetched internally
-          null, // strongResistance fetched internally
-          3,
-          options ?? {}
-        ),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('executeTrade timed out')), timeoutMs)
-        )
-      ]);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Trade execution timed out')), timeoutMs)
+      );
+
+      // Race between order completion and timeout
+      const tradeResult = await Promise.race([tradePromise, timeoutPromise]);
+
+      // Monitor entry order status
+      const { entryOrder } = tradeResult;
+      if (!entryOrder?.orderId) {
+        throw new Error('Entry order not returned from executeTrade');
+      }
+
+      const startTime = Date.now();
+      let filled = false;
+
+      while (!filled && Date.now() - startTime < timeoutMs) {
+        const orderResp = await fetch(`${baseUrl}/fapi/v1/order?symbol=${symbol}&orderId=${entryOrder.orderId}&timestamp=${Date.now()}`, {
+          method: 'GET',
+          headers: { 'X-MBX-APIKEY': apiKey }
+        });
+        const orderData = await orderResp.json();
+
+        if (orderData.status === 'FILLED') {
+          filled = true;
+          console.log(`[MONITOR] Order filled: ${entryOrder.orderId}, filledQty: ${orderData.executedQty}`);
+          break;
+        } else {
+          console.log(`[MONITOR] Waiting for fill... status: ${orderData.status}, filledQty: ${orderData.executedQty}`);
+        }
+
+        await new Promise(r => setTimeout(r, intervalMs));
+      }
+
+      if (!filled) throw new Error('Order not filled within timeout');
+
+      return tradeResult;
     };
 
-    const tradeResponse = await executeWithTimeout(15000); // 15 seconds timeout
-    console.log("[DEBUG] Trade Response:", tradeResponse);
-    return res.json({ success: true, tradeResponse });
+    const tradeResult = await monitorOrderUntilFilled();
+
+    console.log("[DEBUG] Trade executed successfully:", tradeResult);
+
+    return res.json({
+      message: 'Trade executed successfully and filled.',
+      tradeResult
+    });
 
   } catch (err) {
-    console.error("[FATAL ERROR] /api/execute-trade crashed:", err.message);
-    return res.status(500).json({ error: err.message, stack: err.stack });
+    console.error("[ERROR] /api/execute-trade:", err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 

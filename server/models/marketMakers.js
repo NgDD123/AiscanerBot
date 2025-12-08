@@ -40,10 +40,10 @@ async function getATR(symbol, interval = '1h', limit = 14, exchangeType = 'binan
 // ---------------- Main function ----------------
 async function getAdvancedMarketMakers(
     symbol,
-    limit = 1000,
+    limit = 500,
     exchangeType = 'binancefutures',
-    snapshots = 3,
-    intervalMs = 5000,
+    snapshots = 1,
+    intervalMs = 1000,
     riskReward = 2,
     maxSLPercent = 8,
     minTPPercent = 5
