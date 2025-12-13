@@ -57,6 +57,39 @@ const getServerTime = async (exchangeType) => {
   return (await r.json()).serverTime;
 };
 
+
+/**
+ * 🔒 FORCE LEVERAGE TO 1x (DO NOT CHANGE TRADE LOGIC)
+ */
+const setLeverageTo1x = async (apiKey, apiSecretKey, exchangeType, symbol) => {
+  const baseUrl = getBinanceBaseUrl(exchangeType);
+  const serverTime = await getServerTime(exchangeType);
+
+  const leverageParams = `symbol=${symbol}&leverage=1&timestamp=${serverTime}`;
+  const leverageSignature = crypto
+    .createHmac('sha256', apiSecretKey)
+    .update(leverageParams)
+    .digest('hex');
+
+  const leverageUrl = `${baseUrl}/fapi/v1/leverage?${leverageParams}&signature=${leverageSignature}`;
+
+  console.log(`⚙️ Setting leverage to 1x for ${symbol}`);
+
+  const leverageResponse = await fetch(leverageUrl, {
+    method: 'POST',
+    headers: { 'X-MBX-APIKEY': apiKey }
+  });
+
+  const leverageData = await leverageResponse.json();
+
+  if (!leverageResponse.ok) {
+    throw new Error(`Leverage error: ${leverageData.msg || 'Unknown error'}`);
+  }
+
+  return leverageData;
+};
+
+
 /**
  * Place signed order
  */
@@ -147,6 +180,7 @@ async function executeTrade(
     trailingCallbackRatePct: 1.5,
     klinesIntervalForAtr: '5m',
     klinesLimitForAtr: 14,
+     stopLossPercent: 0.02,
     ...options
   };
 
@@ -169,6 +203,7 @@ async function executeTrade(
   const info = await infoRes.json();
   const symbolInfo = info.symbols.find(s => s.symbol === symbol);
   if (!symbolInfo) throw new Error(`Symbol ${symbol} not found`);
+  await setLeverageTo1x(apiKey, apiSecretKey, exType, symbol);
 
   const qtyPrecision = symbolInfo.quantityPrecision ?? 8;
   const pricePrecision = symbolInfo.pricePrecision ?? 8;
@@ -219,7 +254,6 @@ async function executeTrade(
   // compute ATR for protections
   const kl = await fetchKlines(symbol, exType, cfg.klinesIntervalForAtr, cfg.klinesLimitForAtr);
   const atr = computeATR(kl);
-
   let stopPrice, tpPrice, trailingCallbackRate;
   if (atr) {
     stopPrice = action === 'BUY' ? avgPrice - atr * cfg.stopAtrMultiplier : avgPrice + atr * cfg.stopAtrMultiplier;

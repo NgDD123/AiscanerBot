@@ -270,7 +270,7 @@ async function evaluateStrategy(symbol, exchangeType = 'binancefutures') {
                 buyScore++;
                 console.log('Ichimoku: Strong Bullish Trend → +1 buyScore');
             } else if (ichimokuTrend.trend === 'BEARISH') {
-                sellScore++;
+                sellScore += 2;
                 console.log('Ichimoku: Strong Bearish Trend → +1 sellScore');
             } else {
                 console.log('Ichimoku: Weak or Neutral Trend → No score change');
@@ -295,7 +295,7 @@ async function evaluateStrategy(symbol, exchangeType = 'binancefutures') {
             buyScore++;
             console.log('OBV Trend indicates UPTREND → Incrementing buyScore');
         } else if (obvTrend.includes('DOWNTREND')) {
-            sellScore++;
+            sellScore += 2;
             console.log('OBV Trend indicates DOWNTREND → Incrementing sellScore');
         } else {
             console.log('OBV Trend too weak or no lasting trend → No score change');
@@ -347,7 +347,7 @@ async function evaluateStrategy(symbol, exchangeType = 'binancefutures') {
         }
     }
 
-    if (buyScore >= 7) {
+    if (buyScore >= 6) {
         console.log('Final Decision: BUY');
         return { signal: 'BUY', price: latest.close, buyScore, sellScore };
     } else if (sellScore >= 6) {
