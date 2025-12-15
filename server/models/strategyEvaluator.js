@@ -302,7 +302,7 @@ async function evaluateStrategy(symbol, exchangeType = 'binancefutures') {
         }
 
         if (delta >= 20 && makers?.largeBidWalls?.length > 0) {
-            buyScore += 2;
+            buyScore += 1;
             console.log("✅ Delta BUY → Aggressive buyers + Bid walls (+2 buyScore)");
         } else if (delta <= -20 && makers?.largeAskWalls?.length > 0) {
             sellScore += 2;
@@ -347,7 +347,7 @@ async function evaluateStrategy(symbol, exchangeType = 'binancefutures') {
         }
     }
 
-    if (buyScore >= 6) {
+    if (buyScore >= 7) {
         console.log('Final Decision: BUY');
         return { signal: 'BUY', price: latest.close, buyScore, sellScore };
     } else if (sellScore >= 6) {

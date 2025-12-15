@@ -178,9 +178,9 @@ async function executeTrade(
     trailingAtrMultiplier: 0.5,
     fallbackStopPct: 0.015,
     trailingCallbackRatePct: 1.5,
-    klinesIntervalForAtr: '15m',
+    klinesIntervalForAtr: '1h',
     klinesLimitForAtr: 14,
-     stopLossPercent: 0.02,
+    stopLossPercent: 0.02,
     ...options
   };
 
