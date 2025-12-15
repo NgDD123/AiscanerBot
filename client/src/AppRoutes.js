@@ -25,6 +25,11 @@ import QualifiedPairsList from "./components/pages/scanerStore/QualifiedPairsLis
 import ChartPage from "./components/pages/scanerStore/ChartPage";
 import FinancialCourses from "./components/pages/FinancialCourses"
 import TradingTips from "./components/pages/TradingTips";
+import CoursesDashboard from "./components/pages/CoursesDashboard";
+import CoursesDashboord from "./components/pages/courseDboard";
+import TeacherCourses from "./components/pages/TeacherCourses";
+import StudentCourses from "./components/pages/StudentCourses";
+import CourseDetails from "./components/pages/CourseDetails";
 function AppRoutes() {
   const userInfo = useSelector((state) => state?.user?.user?.user);
 
@@ -58,6 +63,11 @@ function AppRoutes() {
           <Route path="/about" element={<About />} />
           <Route path="/courses" element={<FinancialCourses/>}/>
            <Route path="/tips" element={<TradingTips/>}/>
+           {/* <Route path ="/courses" element = {<CoursesDashboard/>}/> */}
+           <Route path = "/course" element = {<CoursesDashboord/>}/>
+           <Route path="/my-courses" element={<StudentCourses />} />
+           <Route path="/teach-courses" element={<TeacherCourses />} />
+           <Route path="/course/:id" element={<CourseDetails />} />
 
         </Route>
 
