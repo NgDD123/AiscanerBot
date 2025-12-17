@@ -5,41 +5,65 @@ import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { FaBook } from "react-icons/fa";
 import LessonPlayer from "./LessonPlayer";
+import { fetchCourseById } from "../../servece/courseService";
 
 const CourseDetails = () => {
-  const { id } = useParams();
+  const { id } = useParams(); // ✅ THIS MUST EXIST
   const [course, setCourse] = useState(null);
   const [currentLesson, setCurrentLesson] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    // MOCK DATA (replace with API later)
-    setCourse({
-      id,
-      title: "Stock Market Mastery",
-      description:
-        "Learn professional stock market trading, investing strategies, and risk management.",
-      lessons: [
-        {
-          id: "l1",
-          title: "Introduction to Stock Market",
-          videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
-        },
-        {
-          id: "l2",
-          title: "Understanding Charts",
-          videoUrl: "https://www.w3schools.com/html/movie.mp4",
-        },
-        {
-          id: "l3",
-          title: "Risk Management",
-          videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
-        },
-      ],
-    });
+    const loadCourse = async () => {
+      if (!id) {
+        setError("Invalid course ID");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const data = await fetchCourseById(id);
+        setCourse(data);
+
+        if (data?.lessons?.length > 0) {
+          setCurrentLesson(data.lessons[0]);
+        }
+      } catch (err) {
+        console.error("Failed to load course", err);
+        setError("Failed to load course details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCourse();
   }, [id]);
 
+  // ⏳ LOADING
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-purple-400 text-xl">
+        Loading course...
+      </div>
+    );
+  }
+
+  // ❌ ERROR
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-red-400 text-lg">
+        {error}
+      </div>
+    );
+  }
+
   if (!course) {
-    return <div className="text-white p-6">Loading...</div>;
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-gray-400">
+        Course not found
+      </div>
+    );
   }
 
   return (
@@ -50,7 +74,7 @@ const CourseDetails = () => {
           <FaBook /> Lessons
         </h2>
 
-        {course.lessons.map((lesson) => (
+        {course.lessons?.map((lesson) => (
           <button
             key={lesson.id}
             onClick={() => setCurrentLesson(lesson)}
@@ -70,13 +94,12 @@ const CourseDetails = () => {
         <h1 className="text-3xl font-bold text-purple-300 mb-2">
           {course.title}
         </h1>
-        <p className="text-gray-400 mb-6">{course.description}</p>
 
         {currentLesson ? (
           <LessonPlayer lesson={currentLesson} course={course} />
         ) : (
           <div className="text-gray-400">
-            Select a lesson to start learning 🚀
+            No lessons available for this course.
           </div>
         )}
       </div>

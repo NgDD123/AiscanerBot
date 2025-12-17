@@ -6,6 +6,7 @@ import { fetchMyCourses } from "../../servece/courseService";
 import CreateCourseForm from "../../components/courses/CreateCourseForm";
 import { motion } from "framer-motion";
 import { FaChalkboardTeacher, FaCog } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 const TeacherCourses = () => {
   const [courses, setCourses] = useState([]);
@@ -18,6 +19,7 @@ const TeacherCourses = () => {
   useEffect(() => {
     loadCourses();
   }, []);
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-gray-900 text-white px-6 py-10">
@@ -50,10 +52,14 @@ const TeacherCourses = () => {
               {course.title}
             </h3>
 
-            <button className="w-full bg-purple-600 hover:bg-purple-700 transition p-3 rounded-xl flex items-center justify-center gap-2">
+            <button
+              onClick={() => navigate(`/teacher/course/${course.id}`)}
+              className="w-full bg-purple-600 hover:bg-purple-700 transition p-3 rounded-xl flex items-center justify-center gap-2"
+            >
               <FaCog />
               Manage Course
             </button>
+
           </motion.div>
         ))}
       </div>

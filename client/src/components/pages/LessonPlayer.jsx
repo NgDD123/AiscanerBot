@@ -30,11 +30,19 @@ const LessonPlayer = ({ lesson, course }) => {
         {lesson.title}
       </h2>
 
-      <video
-        controls
-        className="w-full rounded-xl border border-gray-700"
-        src={lesson.videoUrl}
-      />
+      {lesson.videoType === "youtube" ? (
+        <iframe
+            className="w-full h-[400px] rounded-xl border border-gray-700"
+            src={lesson.videoUrl.replace("watch?v=", "embed/")}
+            allowFullScreen
+        />
+        ) : (
+        <video
+            controls
+            className="w-full rounded-xl border border-gray-700"
+            src={lesson.videoUrl}
+        />
+        )}
 
       <button
         onClick={handleComplete}

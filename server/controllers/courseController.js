@@ -4,6 +4,10 @@ const {
   getTeacherCourses,
   getStudentCourses,
   enrollStudent,
+  getCourseById, // ✅ ADD THIS MODEL METHOD
+  addLesson,
+  updateLesson,
+  deleteLesson,
 } = require("../models/courseModel");
 
 /**
@@ -13,25 +17,14 @@ const createCourseController = async (req, res) => {
   console.log("➡️ createCourseController HIT");
 
   try {
-    console.log("📦 Request body:", req.body);
-    console.log("👤 Auth user:", req.user);
-
     const { title, lessons } = req.body;
     const teacherId = req.user?.uid;
 
-    console.log("📝 Title:", title);
-    console.log("📚 Lessons:", lessons);
-    console.log("🧑‍🏫 Teacher ID:", teacherId);
-
     if (!teacherId) {
-      console.log("❌ Teacher ID missing");
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     const courseId = await createCourse({ title, lessons, teacherId });
-
-    console.log("✅ Course created with ID:", courseId);
-
     res.status(201).json({ success: true, courseId });
   } catch (err) {
     console.error("🔥 ERROR in createCourseController:", err);
@@ -43,15 +36,8 @@ const createCourseController = async (req, res) => {
  * GET ALL COURSES (Public)
  */
 const getAllCoursesController = async (req, res) => {
-  console.log("➡️ getAllCoursesController HIT");
-
   try {
-    console.log("📡 Fetching all courses...");
-
     const courses = await getAllCourses();
-
-    console.log("✅ Courses fetched:", courses.length);
-
     res.json(courses);
   } catch (err) {
     console.error("🔥 ERROR in getAllCoursesController:", err);
@@ -63,33 +49,18 @@ const getAllCoursesController = async (req, res) => {
  * GET MY COURSES (Student / Teacher)
  */
 const getMyCoursesController = async (req, res) => {
-  console.log("➡️ getMyCoursesController HIT");
-
   try {
-    console.log("👤 Auth user:", req.user);
-
     const userId = req.user?.uid;
     const role = req.user?.role;
 
-    console.log("🆔 User ID:", userId);
-    console.log("🎭 Role:", role);
-
     if (!userId || !role) {
-      console.log("❌ Missing userId or role");
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    let courses;
-
-    if (role === "teacher") {
-      console.log("🧑‍🏫 Fetching teacher courses...");
-      courses = await getTeacherCourses(userId);
-    } else {
-      console.log("🎓 Fetching student courses...");
-      courses = await getStudentCourses(userId);
-    }
-
-    console.log("✅ My courses fetched:", courses.length);
+    const courses =
+      role === "teacher"
+        ? await getTeacherCourses(userId)
+        : await getStudentCourses(userId);
 
     res.json(courses);
   } catch (err) {
@@ -102,27 +73,15 @@ const getMyCoursesController = async (req, res) => {
  * ENROLL STUDENT
  */
 const enrollCourseController = async (req, res) => {
-  console.log("➡️ enrollCourseController HIT");
-
   try {
-    console.log("👤 Auth user:", req.user);
-    console.log("📦 Request body:", req.body);
-
     const userId = req.user?.uid;
     const { courseId } = req.body;
 
-    console.log("🆔 User ID:", userId);
-    console.log("📘 Course ID:", courseId);
-
     if (!userId || !courseId) {
-      console.log("❌ Missing userId or courseId");
       return res.status(400).json({ error: "Missing data" });
     }
 
     await enrollStudent(courseId, userId);
-
-    console.log("✅ Student enrolled successfully");
-
     res.json({ success: true });
   } catch (err) {
     console.error("🔥 ERROR in enrollCourseController:", err);
@@ -130,9 +89,98 @@ const enrollCourseController = async (req, res) => {
   }
 };
 
+/**
+ * GET SINGLE COURSE BY ID (FIXES 404)
+ */
+const getCourseByIdController = async (req, res) => {
+  console.log("➡️ getCourseByIdController HIT");
+
+  try {
+    const courseId = req.params.id;
+
+    const course = await getCourseById(courseId);
+
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    res.json(course);
+  } catch (err) {
+    console.error("🔥 ERROR in getCourseByIdController:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+const addLessonController = async (req, res) => {
+  console.log("➡️ addLessonController HIT");
+  console.log("📥 BODY:", req.body);
+
+  try {
+    const courseId = req.params.id;
+    const { title, videoUrl, videoType } = req.body;
+
+    // ✅ strict validation
+    if (!title || !videoUrl) {
+      return res.status(400).json({
+        message: "Lesson title and video URL are required",
+      });
+    }
+
+    await addLesson(courseId, {
+      title,
+      videoUrl,
+      videoType: videoType || "youtube",
+      createdAt: Date.now(),
+    });
+
+    res.status(201).json({ message: "Lesson added successfully" });
+  } catch (error) {
+    console.error("🔥 addLessonController ERROR:", error);
+    res.status(500).json({ message: "Failed to add lesson" });
+  }
+};
+
+
+/**
+ * UPDATE LESSON
+ */
+const updateLessonController = async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const updates = req.body;
+
+    await updateLesson(id, lessonId, updates);
+
+    res.json({ message: "Lesson updated" });
+  } catch (err) {
+    console.error("Update lesson failed:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * DELETE LESSON
+ */
+const deleteLessonController = async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+
+    await deleteLesson(id, lessonId);
+
+    res.json({ message: "Lesson deleted" });
+  } catch (err) {
+    console.error("Delete lesson failed:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
 module.exports = {
   createCourseController,
   getAllCoursesController,
   getMyCoursesController,
   enrollCourseController,
+  getCourseByIdController, // ✅ NOW VALID
+  addLessonController,
+  updateLessonController,
+  deleteLessonController, // ✅ EXPORT
 };

@@ -49,3 +49,36 @@ const res = await axios.post(
 );
 return res.data;
 };
+export const fetchCourseById = async (courseId) => {
+  const token = await getToken();
+  const res = await axios.get(`${API_BASE}/${courseId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const addLesson = async (courseId, lessonData) => {
+  const token = await getToken();
+
+  const res = await axios.post(
+    `${API_BASE}/${courseId}/lessons`,
+    lessonData,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  return res.data;
+};
+
+
+export const deleteLesson = async (courseId, lessonId) => {
+  const token = await getToken();
+  const res = await axios.delete(
+    `${API_BASE}/${courseId}/lessons/${lessonId}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return res.data;
+};

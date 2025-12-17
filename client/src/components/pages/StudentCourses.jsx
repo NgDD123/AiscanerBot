@@ -1,25 +1,96 @@
 // ===============================
-// src/pages/student/StudentCourses.jsx (PROFESSIONAL)
+// src/pages/student/StudentCourses.jsx
 // ===============================
 import { useEffect, useState } from "react";
-import { fetchMyCourses } from "../../servece/courseService";
+import { fetchMyCourses } from "../../servece/courseService"; // ✅ FIXED PATH
 import { motion } from "framer-motion";
 import { FaBookOpen, FaPlay, FaChartLine } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { getAuth } from "firebase/auth";
+
+// 🔹 Firestore (SAFE IMPORT)
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "../../firebase";
 
 const StudentCourses = () => {
   const [courses, setCourses] = useState([]);
-  const navigate = useNavigate();
+  const [progressMap, setProgressMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
+  const navigate = useNavigate();
+  const auth = getAuth();
+
+  // 🔹 Load enrolled courses (SAFE)
   useEffect(() => {
-    fetchMyCourses().then(setCourses);
+    const loadCourses = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchMyCourses();
+        setCourses(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load courses", err);
+        setError("Failed to load enrolled courses.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCourses();
   }, []);
 
-  const getProgress = (courseId) => {
-    const saved = localStorage.getItem(`progress-${courseId}`);
-    if (!saved) return 0;
-    return JSON.parse(saved).percent || 0;
-  };
+  // 🔹 Load progress from Firestore
+  useEffect(() => {
+    const loadProgress = async () => {
+      if (!auth.currentUser) return;
+
+      try {
+        const q = query(
+          collection(db, "courseProgress"),
+          where("userId", "==", auth.currentUser.uid)
+        );
+
+        const snap = await getDocs(q);
+        const map = {};
+
+        snap.forEach((doc) => {
+          const data = doc.data();
+          map[data.courseId] = data.percent || 0;
+        });
+
+        setProgressMap(map);
+      } catch (err) {
+        console.warn("Progress loading skipped:", err.message);
+      }
+    };
+
+    loadProgress();
+  }, [auth.currentUser]);
+
+  const getProgress = (courseId) => progressMap[courseId] || 0;
+
+  // ⏳ LOADING
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-purple-400 text-xl">
+        Loading your courses...
+      </div>
+    );
+  }
+
+  // ❌ ERROR
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-red-400 text-lg">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white px-6 py-10">
@@ -53,19 +124,18 @@ const StudentCourses = () => {
               whileHover={{ scale: 1.03 }}
               className="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg flex flex-col justify-between"
             >
-              {/* COURSE INFO */}
               <div>
                 <h2 className="text-2xl font-bold text-purple-300 mb-2">
                   {course.title}
                 </h2>
 
                 <p className="text-gray-400 text-sm mb-4">
-                  Continue where you left off and track your learning progress.
+                  Track your learning progress.
                 </p>
 
                 {/* PROGRESS */}
                 <div className="mb-4">
-                  <div className="flex justify-between items-center text-sm text-gray-300 mb-1">
+                  <div className="flex justify-between text-sm text-gray-300 mb-1">
                     <span className="flex items-center gap-1">
                       <FaChartLine /> Progress
                     </span>
@@ -74,7 +144,7 @@ const StudentCourses = () => {
 
                   <div className="w-full bg-gray-700 rounded-full h-3">
                     <div
-                      className="bg-purple-600 h-3 rounded-full transition-all"
+                      className="bg-purple-600 h-3 rounded-full"
                       style={{ width: `${progress}%` }}
                     />
                   </div>

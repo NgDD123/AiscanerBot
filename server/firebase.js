@@ -2,7 +2,7 @@
 const { initializeApp } = require("firebase/app");
 const admin = require("firebase-admin");
 const {getAuth}  =require("firebase/auth");
-const { getFirestore, collection, getDocs, updateDoc, doc,addDoc,deleteDoc }  =require('firebase/firestore');
+const { getFirestore, collection, getDocs, getDoc, updateDoc, doc,addDoc,deleteDoc }  =require('firebase/firestore');
 const { FIREBASE_ADMIN_CONFIG, FIREBASE_APP_CONFIG } = require("./config/env");
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -23,4 +23,4 @@ const app = initializeApp (firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-module.exports ={ db, auth, collection, getDocs, updateDoc, doc,addDoc,deleteDoc,initFirebase };
+module.exports ={ db, auth, collection, getDocs, getDoc, updateDoc, doc,addDoc,deleteDoc,initFirebase };

@@ -30,6 +30,8 @@ import CoursesDashboord from "./components/pages/courseDboard";
 import TeacherCourses from "./components/pages/TeacherCourses";
 import StudentCourses from "./components/pages/StudentCourses";
 import CourseDetails from "./components/pages/CourseDetails";
+import TeacherLessonManager from "./components/pages/TeacherLessonManager"
+
 function AppRoutes() {
   const userInfo = useSelector((state) => state?.user?.user?.user);
 
@@ -68,6 +70,8 @@ function AppRoutes() {
            <Route path="/my-courses" element={<StudentCourses />} />
            <Route path="/teach-courses" element={<TeacherCourses />} />
            <Route path="/course/:id" element={<CourseDetails />} />
+           <Route path="/teacher/course/:id" element={<TeacherLessonManager />} />
+
 
         </Route>
 
