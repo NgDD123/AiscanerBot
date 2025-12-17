@@ -221,6 +221,7 @@ module.exports = {
   getTeacherCourses,
   getStudentCourses,
   enrollStudent,
+  
   getCourseById, // ✅ EXPORT
   addLesson,
   updateLesson,
