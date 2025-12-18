@@ -8,6 +8,7 @@ const {
   addLesson,
   updateLesson,
   deleteLesson,
+   saveUploadedFile, // ✅ ADD
 } = require("../models/courseModel");
 
 /**
@@ -173,6 +174,25 @@ const deleteLessonController = async (req, res) => {
   }
 };
 
+/**
+ * FILE UPLOAD CONTROLLER
+ */
+const uploadFileController = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const fileData = await saveUploadedFile(req.file);
+
+    res.status(201).json(fileData);
+  } catch (error) {
+    console.error("🔥 Upload error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
 
 module.exports = {
   createCourseController,
@@ -183,4 +203,5 @@ module.exports = {
   addLessonController,
   updateLessonController,
   deleteLessonController, // ✅ EXPORT
+   uploadFileController, // ✅ ADD
 };

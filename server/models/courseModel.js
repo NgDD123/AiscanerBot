@@ -215,6 +215,20 @@ const deleteLesson = async (courseId, lessonId) => {
   });
 };
 
+/**
+ * FILE UPLOAD MODEL
+ */
+const saveUploadedFile = async (file) => {
+  if (!file) throw new Error("No file provided");
+
+  return {
+    url: `${process.env.BASE_URL || "http://localhost:8001"}/uploads/${file.filename}`,
+    name: file.originalname,
+    type: file.mimetype,
+    size: file.size,
+  };
+};
+
 module.exports = {
   createCourse,
   getAllCourses,
@@ -226,4 +240,5 @@ module.exports = {
   addLesson,
   updateLesson,
   deleteLesson,
+   saveUploadedFile, // ✅ ADD
 };

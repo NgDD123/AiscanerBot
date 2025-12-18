@@ -105,3 +105,27 @@ export const togglePublish = async (courseId, published) => {
   );
   return res.data;
 };
+
+// ===============================
+// 📁 FILE UPLOAD (FIX FOR YOUR ERROR)
+// ===============================
+export const uploadFile = async (file) => {
+  const token = await getToken();
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await axios.post(
+    `${API_BASE}/upload`,
+    formData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+
+  // ✅ must return uploaded file URL
+  return res.data.url;
+};

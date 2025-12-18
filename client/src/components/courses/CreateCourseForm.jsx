@@ -29,11 +29,11 @@ const CreateCourseForm = ({ onCreated }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border p-4 rounded-xl bg-white">
+    <form onSubmit={handleSubmit} className="border p-4 rounded-xl bg-white ">
       <h2 className="text-lg font-bold mb-3">Create Course</h2>
 
       <input
-        className="border p-2 w-full mb-2"
+        className="border p-2 w-full mb-2 text-black"
         placeholder="Course title"
         value={title}
         onChange={e => setTitle(e.target.value)}
@@ -41,7 +41,7 @@ const CreateCourseForm = ({ onCreated }) => {
       />
 
       <textarea
-        className="border p-2 w-full mb-2"
+        className="border p-2 w-full mb-2 text-black"
         placeholder="Lessons (comma separated)"
         value={lessons}
         onChange={e => setLessons(e.target.value)}
