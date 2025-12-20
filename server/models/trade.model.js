@@ -231,7 +231,7 @@ async function executeTrade(
   entryPrice = fixPrice(entryPrice);
 
   // compute quantity
-  let quantity = ((availableUSDT * 0.98) / entryPrice);
+  let quantity = ((availableUSDT * 0.3) / entryPrice);
   if (entryPrice * quantity < minNotional) quantity = Math.ceil(minNotional / entryPrice);
   quantity = fixQty(quantity);
   if (quantity <= 0) throw new Error('Invalid quantity computed');

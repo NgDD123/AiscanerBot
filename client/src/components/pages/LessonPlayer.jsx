@@ -1,9 +1,6 @@
-// ===============================
-// src/pages/courses/LessonPlayer.jsx
-// ===============================
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FaCheckCircle, FaFilePdf, FaFileImage, FaFilePowerpoint, FaFileAlt } from "react-icons/fa";
+import { FaCheckCircle, FaFilePdf, FaImage, FaFilePowerpoint, FaFont } from "react-icons/fa";
 import useCourseProgress from "../../hooks/useCourseProgress";
 
 const LessonPlayer = ({ lesson, course }) => {
@@ -17,63 +14,6 @@ const LessonPlayer = ({ lesson, course }) => {
   const handleComplete = () => {
     markCompleted(lesson.id);
     setCompleted(true);
-  };
-
-  // 🔹 Render lesson content blocks
-  const renderContent = (content) => {
-    switch (content.type) {
-      case "text":
-        return (
-          <div className="bg-gray-900 p-4 rounded-xl border border-gray-700">
-            <p className="text-gray-200 whitespace-pre-line">
-              {content.value}
-            </p>
-          </div>
-        );
-
-      case "image":
-        return (
-          <img
-            src={content.url}
-            alt={content.name}
-            className="rounded-xl border border-gray-700 max-h-[500px]"
-          />
-        );
-
-      case "pdf":
-        return (
-          <div className="space-y-2">
-            <iframe
-              src={content.url}
-              className="w-full h-[500px] rounded-xl border border-gray-700"
-              title={content.name}
-            />
-            <a
-              href={content.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-purple-400 underline"
-            >
-              <FaFilePdf /> Download PDF
-            </a>
-          </div>
-        );
-
-      case "ppt":
-      case "doc":
-      default:
-        return (
-          <a
-            href={content.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-gray-800 p-3 rounded-xl border border-gray-700 hover:bg-gray-700"
-          >
-            {content.type === "ppt" ? <FaFilePowerpoint /> : <FaFileAlt />}
-            <span className="text-gray-200">{content.name}</span>
-          </a>
-        );
-    }
   };
 
   return (
@@ -105,16 +45,75 @@ const LessonPlayer = ({ lesson, course }) => {
         )
       )}
 
-      {/* 📘 ADDITIONAL CONTENT */}
+      {/* 📚 LESSON CONTENTS */}
       {lesson.contents?.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-xl font-semibold text-gray-200">
+          <h3 className="text-xl font-semibold text-purple-300">
             Lesson Materials
           </h3>
 
-          {lesson.contents.map((content) => (
-            <div key={content.id}>
-              {renderContent(content)}
+          {lesson.contents.map((c, index) => (
+            <div
+              key={index}
+              className="bg-gray-800 border border-gray-700 rounded-xl p-4"
+            >
+              {/* TEXT */}
+              {c.type === "text" && (
+                <div className="flex gap-3">
+                  <FaFont className="text-purple-400 mt-1" />
+                  <p className="text-gray-200 whitespace-pre-line">
+                    {c.value}
+                  </p>
+                </div>
+              )}
+
+              {/* IMAGE */}
+              {c.type === "image" && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-purple-300">
+                    <FaImage /> Image
+                  </div>
+                  <img
+                    src={c.url || c.value}
+                    alt="Lesson content"
+                    className="rounded-xl max-h-[400px]"
+                  />
+                </div>
+              )}
+
+              {/* PDF */}
+              {c.type === "pdf" && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-purple-300">
+                    <FaFilePdf /> PDF Document
+                  </div>
+                  <a
+                    href={c.url || c.value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 underline"
+                  >
+                    Open PDF
+                  </a>
+                </div>
+              )}
+
+              {/* PPT / DOC */}
+              {(c.type === "ppt" || c.type === "doc") && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-purple-300">
+                    <FaFilePowerpoint /> Presentation / Document
+                  </div>
+                  <a
+                    href={c.url || c.value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 underline"
+                  >
+                    Download File
+                  </a>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -134,7 +133,7 @@ const LessonPlayer = ({ lesson, course }) => {
         {completed ? "Completed" : "Mark as Completed"}
       </button>
 
-      {/* 📊 PROGRESS BAR */}
+      {/* 📊 PROGRESS */}
       <div className="mt-6">
         <p className="text-gray-300 mb-2">
           Progress: {progress.percent}%
