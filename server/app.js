@@ -28,7 +28,7 @@ const { evaluateStrategy } = require('./models/strategyEvaluator');
 const chartRoutes = require('./Routes/chartData');
 const { executeTrade } = require('./models/trade.model'); // NEW: separate executeTrade
 const { getAdvancedMarketMakers } = require('./models/marketMakers');
-//const courseRoutes = require('./Routes/courseRoutes');
+const courseRoutes = require('./Routes/courseRoutes');
 
 
 // different logger instances
@@ -62,7 +62,7 @@ app.use('/api/top-pairs', toppairsRoute);
 app.use('/evaluatestarategy', evaluateStrategyRoute )
 app.use('/api/best-pair', bestpairRoute )
 app.use('/api/chart-data', chartRoutes);
-//app.use ("/api/courses", courseRoutes )
+app.use ("/api/courses", courseRoutes )
 
 // Middleware for logging requests (optional)
 app.use((req, res, next) => {
